@@ -997,11 +997,11 @@ def main(cfg):
 
     # setup train/eval model
     if cfg.run.prior == 'mvn':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, mu = 0., cov = 1.)
+        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = cfg.run.variable, mu = 0., cov = 1.)
     elif cfg.run.prior == 'ggd':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = True, loc = 0., scale = 1., p = 0.1, dim = cfg.run.dim)
+        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = cfg.run.variable, loc = 0., scale = 1., p = 0.1, dim = cfg.run.dim)
     elif cfg.run.prior == 'mvggd':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = True, loc = 0., scale = 1., p = 0.1, dw=1., dim = cfg.run.dim)
+        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = cfg.run.variable, loc = 0., scale = 1., p = 0.1, dw=1., dim = cfg.run.dim)
 
     # summary writer
     writer = SummaryWriter('./')
