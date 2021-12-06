@@ -134,3 +134,19 @@ class FlowDataLoader(object):
                 data = data.astype('float32')
 
             yield torch.from_numpy(data)
+    def sample(self, n):
+        if self.name == 'circles':
+            return _sample_circles(n)
+        elif self.name == 'ggd':
+            return _sample_ggd(n,self._args['beta'],self._args['dim'])
+
+        elif self.name == 'moons':
+            return _sample_moons(n)
+        elif self.name == 'normals':
+            return _sample_normals(n)
+        elif self.name == 'swiss':
+            return _sample_swiss(n)
+        elif self.name == 's_curve':
+            return _sample_s_curve(n)
+        else:
+            raise Exception('unsupported type: "%s"' % self.name)
