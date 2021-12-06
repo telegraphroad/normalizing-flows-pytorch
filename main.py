@@ -946,7 +946,7 @@ def main(cfg):
 
 
     # setup train/eval model
-    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, loc = 0., scale = 1., p = 0.1)
+    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = True, loc = 0., scale = 1., p = 0.1)
 
     # summary writer
     writer = SummaryWriter('./')
