@@ -666,13 +666,22 @@ class Model(object):
             self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov']).to(self.device)
 
             if self._var_base_dist == True:
-                self.mu.requires_grad = False
-                self.covar.requires_grad = False
+                self.mu.requires_grad = True
+                self.covar.requires_grad = True
             else:
                 self.mu.requires_grad = False
                 self.covar.requires_grad = False
                 
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
+            
+        elif dist_args['bd_family'] == 'ggd':
+            self.loc = nn.Parameter(torch.zeros(()) + dist_args['loc']).to(self.device)
+            self.scale = nn.Parameter(torch.zeros(()) + dist_args['scale']).to(self.device)
+            self.p = nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device))
+            self.loc.requires_grad = True
+            self.scale.requires_grad = True
+            self.p.requires_grad = True
+            self.base_distribution = GenNormal(loc=self.loc,scale=self.scale,p=self.p)
             
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
@@ -710,7 +719,7 @@ class Model(object):
         loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
 
         self.optim.zero_grad()
-        loss.backward()#retain_graph=True)
+        loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
 
@@ -937,7 +946,7 @@ def main(cfg):
 
 
     # setup train/eval model
-    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, mu = 0., cov = 0.)
+    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, loc = 0., scale = 1., p = 0.1)
 
     # summary writer
     writer = SummaryWriter('./')
@@ -982,7 +991,7 @@ def main(cfg):
             save_files = step % (cfg.run.display * 1000) == 0
             model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
             writer.flush()
-            print(model.mu.detach().cpu().numpy(),model.covar.detach().cpu().numpy())
+            print(model.loc.detach().cpu().numpy(),model.scale.detach().cpu().numpy(),,model.p.detach().cpu().numpy())
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
