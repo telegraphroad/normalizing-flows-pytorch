@@ -153,6 +153,7 @@ class Model(object):
 
         # prepare
         y_data = y_data.to(self.device)
+        print(y_data.cpu().numpy())
         n_samples = y_data.size(0)
         if y_data.dim() == 2 and y_data.size(1) == 2:
             dtype = '2d'
@@ -182,9 +183,11 @@ class Model(object):
             pz = self.pz(z)
             z = z.detach().cpu().numpy()
             pz = pz.detach().cpu().numpy()
+            print('z',z)
+            print('pz',pz)
             xs = z[:, 0]
             ys = z[:, 1]
-
+            
             z_image = scatter_plot(xs, ys, colors=pz, title=title)
             writer.add_image('2d/train/z', z_image, step, dataformats='HWC')
 
