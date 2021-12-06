@@ -1050,7 +1050,7 @@ def main(cfg):
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
-            ckpt_file = 'latest.pth'
+            ckpt_file = cfg.run.mname + 'latest.pth'
             model.save_ckpt(step, ckpt_file)
 
 
