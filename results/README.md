@@ -9,6 +9,12 @@ Results
 |:--------:|:------------:|:----:|
 | ![](./density/realnvp/y_data_020000.jpg) | ![](./density/realnvp/y_sample_020000.jpg) | ![](./density/realnvp/movie.gif) |
 
+### Real NVP GGD
+
+| Target | Reproduced | Training |
+|:--------:|:------------:|:----:|
+| ![](./density/realnvpggd/y_data_latest.jpg) | ![](./density/realnvpggd/y_sample_latest.jpg) | ![](./density/realnvpggd/movie.gif) |
+
 
 ### Glow
 

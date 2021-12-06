@@ -36,7 +36,7 @@ logger = Logging(__file__)
 # train/eval model
 # -----------------------------------------------
 class Model(object):
-    def __init__(self, dims=(2, ), datatype=None, cfg=None):
+    def __init__(self, dims=(2, ), datatype=None, cfg=None, **dist_args):
         if torch.cuda.is_available():
             self.device = torch.device('cuda', cfg.run.gpu)
         else:
@@ -45,10 +45,22 @@ class Model(object):
         self.name = cfg.network.name
         self.dims = dims
         self.dimension = np.prod(dims)
+        self._var_base_dist = dist_args['variable']
 
-        mu = torch.zeros(self.dimension, dtype=torch.float32, device=self.device)
-        covar = torch.eye(self.dimension, dtype=torch.float32, device=self.device)
-        self.normal = MultivariateNormal(mu, covar)
+        if dist_args['family'] == 'mvn':
+
+            self.mu = nn.Parameter(torch.zeros((self.dimension, dtype=torch.float32)).to(self.device) + dist_args['mu']).to(self.device)
+            self.covar = nn.Parameter(torch.eye((self.dimension, dtype=torch.float32)).to(self.device) + dist_args['cov']).to(self.device)
+
+            if self._var_base_dist == True:
+                self.mu.requires_grad = True
+                self.covar.requires_grad = True
+            else:
+                self.mu.requires_grad = False
+                self.covar.requires_grad = False
+                
+            self.base_distribution = MultivariateNormal(self.mu, self.covar)
+            
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
         self.net.to(self.device)
@@ -82,7 +94,7 @@ class Model(object):
         z, log_det_jacobian = self.net(y)
         z = z.view(y.size(0), -1)
 
-        loss = -1.0 * torch.mean(self.normal.log_prob(z) + log_det_jacobian)
+        loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
 
         self.optim.zero_grad()
         loss.backward()
@@ -111,20 +123,22 @@ class Model(object):
         z = z.to(self.device)
 
         y, log_det_jacobians = self.net.backward(z.view(-1, *self.dims))
-        log_p = self.normal.log_prob(z) - log_det_jacobians
+        log_p = self.base_distribution.log_prob(z) - log_det_jacobians
 
         return y, torch.exp(log_p)
 
     def sample_z(self, n):
-        return self.normal.sample([n])
-
+        if self._var_base_dist:
+            return self.base_distribution.rsample([n])
+        else:
+            return self.base_distribution.sample([n])
     def log_py(self, y):
         y = y.to(self.device)
         z, log_det_jacobians = self.net(y)
         return self.log_pz(z) + log_det_jacobians
 
     def log_pz(self, z):
-        return self.normal.log_prob(z)
+        return self.base_distribution.log_prob(z)
 
     def py(self, y):
         return torch.exp(self.log_py(y))
