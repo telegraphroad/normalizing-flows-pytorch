@@ -13,6 +13,9 @@ class Glow(nn.Module):
 
         self.dims = dims
         self.n_layers = cfg.layers
+        self.dp1 = None
+        self.dp2 = None
+        self.dp3 = None
 
         layers = []
         if datatype == 'image':
