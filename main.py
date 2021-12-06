@@ -663,7 +663,8 @@ class Model(object):
         self.dims = dims
         self.dimension = np.prod(dims)
         self._var_base_dist = dist_args['variable_bd']
-
+        self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
+        
         if dist_args['bd_family'] == 'mvn':
 
             self.mu = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu'])
@@ -677,24 +678,63 @@ class Model(object):
                 self.covar.requires_grad = False
                 
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
+            self.net.dp1 = self.mu
+            self.net.dp2 = self.covar
+            
             
         elif dist_args['bd_family'] == 'ggd':
             self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['loc'], requires_grad = True)
             self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['scale'], requires_grad = True)
-            self.p = torch.nn.Parameter(torch.zeros(1).to(self.device) + dist_args['p'], requires_grad = True)
-            self.loc.requires_grad = True
-            self.scale.requires_grad = True
-            self.p.requires_grad = True
+            self.p = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32).to(self.device) + dist_args['p'], requires_grad = True)
+            
+            if self._var_base_dist == True:
+                self.loc.requires_grad = True
+                self.scale.requires_grad = True
+                self.p.requires_grad = True
+
+            else:
+                self.loc.requires_grad = False
+                self.scale.requires_grad = False
+                self.p.requires_grad = False
+                
             #print('pshape',self.p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
             self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
             #print(self.loc,self.scale,self.p)
+            self.net.dp1 = self.loc
+            self.net.dp2 = self.scale
+            self.net.dp3 = self.p
             
+        elif dist_args['bd_family'] == 'mvggd':
+            self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['loc'], requires_grad = True)
+            self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['scale'], requires_grad = True)
+            self.p = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32).to(self.device) + dist_args['p'], requires_grad = True)
+            self.dw = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['dw'], requires_grad = True)
+            
+            if self._var_base_dist == True:
+                self.loc.requires_grad = True
+                self.scale.requires_grad = True
+                self.p.requires_grad = True
+                self.dw.requires_grad = True
 
-        self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
+            else:
+                self.loc.requires_grad = False
+                self.scale.requires_grad = False
+                self.p.requires_grad = False
+                self.dw.requires_grad = False
+                
+            
+            mix = torch.distributions.Categorical(self.dw)
+            comp = GenNormal(self.loc, self.scale,self.p)
 
-        self.net.dp1 = self.loc
-        self.net.dp2 = self.scale
-        self.net.dp3 = self.p
+            self.base_distribution = Independent(ReparametrizedMixtureSameFamily(mix, comp),1)
+            self.net.dp1 = self.loc
+            self.net.dp2 = self.scale
+            self.net.dp3 = self.p
+            self.net.dp3 = self.dw
+
+        
+
+        
         self.net.to(self.device)
 
         if cfg.optimizer.name == 'rmsprop':
@@ -956,7 +996,9 @@ def main(cfg):
 
 
     # setup train/eval model
-    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = True, loc = 0., scale = 1., p = 0.1, dim = cfg.run.dim)
+    #model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = True, loc = 0., scale = 1., p = 0.1, dim = cfg.run.dim)
+    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, mu = 0., cov = 1.)
+    #model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = True, loc = 0., scale = 1., p = 0.1, dw=1., dim = cfg.run.dim)
 
     # summary writer
     writer = SummaryWriter('./')
@@ -1001,7 +1043,7 @@ def main(cfg):
             save_files = step % (cfg.run.display * 1000) == 0
             model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
             writer.flush()
-            print(model.loc.detach().cpu().numpy(),model.scale.detach().cpu().numpy(),model.p.detach().cpu().numpy())
+            print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy(),,model.net.dp4.detach().cpu().numpy())
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
