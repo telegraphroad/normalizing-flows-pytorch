@@ -169,6 +169,7 @@ class Model(object):
             # plot data samples
             xs = y_data[:, 0].cpu().numpy()
             ys = y_data[:, 1].cpu().numpy()
+            print('xs,ys',xs,yx)
             y_image = scatter_plot(xs, ys, title=title)
             writer.add_image('2d/data/y', y_image, step, dataformats='HWC')
 
