@@ -91,8 +91,8 @@ class GenNormal(ExponentialFamily):
         shape = self._extended_shape(sample_shape)
         print('shape',shape)
         ipower = 1.0 / self.p
-        print('ip',ipower.mean())
-        ipower = ipower.cpu()
+        
+        ipower = ipower.mean().cpu()
         gamma_dist = torch.distributions.Gamma(ipower, 1.0)
         
         gamma_sample = gamma_dist.rsample(shape).cpu()
