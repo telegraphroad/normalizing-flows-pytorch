@@ -364,7 +364,7 @@ def main(cfg):
         if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
             writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
             save_files = step % (cfg.run.display * 1000) == 0
-            model.report(writer, dataset.sample(10000), step=step, save_files=save_files)
+            model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
             writer.flush()
             print(model.mu.detach().cpu().numpy(),model.covar.detach().cpu().numpy())
 
