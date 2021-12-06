@@ -679,12 +679,12 @@ class Model(object):
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
             
         elif dist_args['bd_family'] == 'ggd':
-            self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32) + dist_args['loc'], requires_grad = True).to(self.device)
-            self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32) + dist_args['scale'], requires_grad = True).to(self.device)
-            self.p = torch.nn.Parameter(torch.zeros(1) + dist_args['p'], requires_grad = True).to(self.device)
-            #self.loc.requires_grad = True
-            #self.scale.requires_grad = True
-            #self.p.requires_grad = True
+            self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(device) + dist_args['loc'], requires_grad = True)
+            self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(device) + dist_args['scale'], requires_grad = True)
+            self.p = torch.nn.Parameter(torch.zeros(1).to(device) + dist_args['p'], requires_grad = True)
+            self.loc.requires_grad = True
+            self.scale.requires_grad = True
+            self.p.requires_grad = True
             #print('pshape',self.p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
             self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
             #print(self.loc,self.scale,self.p)
