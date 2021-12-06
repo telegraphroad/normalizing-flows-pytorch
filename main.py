@@ -54,11 +54,11 @@ class Model(object):
             self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov']).to(self.device)
 
             if self._var_base_dist == True:
-                self.mu.requires_grad = True
-                self.covar.requires_grad = True
+                self.mu.requires_grad = False
+                self.covar.requires_grad = False
             else:
-                self.mu.requires_grad = True
-                self.covar.requires_grad = True
+                self.mu.requires_grad = False
+                self.covar.requires_grad = False
                 
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
             
