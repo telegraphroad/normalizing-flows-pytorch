@@ -49,9 +49,8 @@ Run
 This repo uses `hydra` to manage hyper parameters in training and evaluation. See [`configs`](./configs) folder to check the parameters for each network.
 
 ```shell
-$ python main.py \
-    network=[planar, realnvp, glow, flow++, maf, resflow, ffjord]\
-    run.distrib=[circles, moons, normals, swiss, s_curve, mnist, cifar10]
+$ python main.py network=glow run.distrib=ggd +run.beta=0.5 +run.dim=2
+
 ```
 
 **Note:**
