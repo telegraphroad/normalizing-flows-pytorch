@@ -97,7 +97,7 @@ class Model(object):
         loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
 
         self.optim.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
 
