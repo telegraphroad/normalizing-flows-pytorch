@@ -105,7 +105,7 @@ class GenNormal(ExponentialFamily):
             gamma_sample = gamma_sample.squeeze(len(gamma_sample.shape) - 1)
             
         print('~~~',binary_sample.shape,gamma_sample.shape)
-        sampled = binary_sample * torch.pow(torch.abs(gamma_sample), ipower)
+        sampled = binary_sample.to(device) * torch.pow(torch.abs(gamma_sample).to(device), ipower)
         
         print(self.loc.detach().cpu().numpy(),':::::',self.scale.detach().cpu().numpy(),':::::',self.p.detach().cpu().numpy())
         #return self.loc.to(device) + self.scale.to(device) * sampled.to(device)
