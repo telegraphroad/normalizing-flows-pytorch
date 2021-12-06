@@ -666,8 +666,8 @@ class Model(object):
 
         if dist_args['bd_family'] == 'mvn':
 
-            self.mu = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu']).to(self.device)
-            self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov']).to(self.device)
+            self.mu = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu'])
+            self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov'])
 
             if self._var_base_dist == True:
                 self.mu.requires_grad = True
@@ -691,15 +691,10 @@ class Model(object):
             
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
-        print('111111111111111',len(list(self.net.parameters())))
-        print(list(self.net.parameters()))
 
-        self.net.dp1 = self.loc
-        self.net.dp2 = self.scale
-        self.net.dp3 = self.p
-        print('222222222222222',len(list(self.net.parameters())))
-        print(list(self.net.parameters()))
-        print(self.net.dp1)
+        #self.net.dp1 = self.loc
+        #self.net.dp2 = self.scale
+        #self.net.dp3 = self.p
         self.net.to(self.device)
 
         if cfg.optimizer.name == 'rmsprop':
