@@ -15,6 +15,7 @@ from common.utils import image_plot, save_image, scatter_plot
 from flows.dataset import FlowDataLoader
 from flows.modules import Logit, Identity
 from common.logging import Logging
+import torch.optim.lr_scheduler
 
 networks = {
     'planar': PlanarFlow,
@@ -79,7 +80,7 @@ class Model(object):
 
         self.schduler = torch.optim.lr_scheduler.StepLR(self.optim,
                                                         step_size=cfg.optimizer.decay_steps,
-                                                        gamma=cfg.optimizer.decay_ratio)
+                                                        gamma=cfg.optimizer.decay_ratio,verbose=True)
 
     def train(self):
         self.net.train()
