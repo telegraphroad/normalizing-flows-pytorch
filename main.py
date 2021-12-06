@@ -692,9 +692,9 @@ class Model(object):
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
 
-        #self.net.dp1 = self.loc
-        #self.net.dp2 = self.scale
-        #self.net.dp3 = self.p
+        self.net.dp1 = self.loc
+        self.net.dp2 = self.scale
+        self.net.dp3 = self.p
         self.net.to(self.device)
 
         if cfg.optimizer.name == 'rmsprop':
