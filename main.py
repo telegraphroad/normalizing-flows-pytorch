@@ -325,7 +325,7 @@ def main(cfg):
 
 
     # setup train/eval model
-    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = False, mu = 0., cov = 0.)
+    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = True, mu = 0., cov = 0.)
 
     # summary writer
     writer = SummaryWriter('./')
