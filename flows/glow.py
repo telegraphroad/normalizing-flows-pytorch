@@ -16,6 +16,7 @@ class Glow(nn.Module):
         self.dp1 = None
         self.dp2 = None
         self.dp3 = None
+        self.dp4 = None
 
         layers = []
         if datatype == 'image':
