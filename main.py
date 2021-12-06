@@ -691,14 +691,14 @@ class Model(object):
             
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
-        print('111111111111111',len(list(m.parameters())))
-        print(list(m.parameters()))
+        print('111111111111111',len(list(self.net.parameters())))
+        print(list(self.net.parameters()))
 
         self.net.dp1 = self.loc
         self.net.dp2 = self.scale
         self.net.dp3 = self.p
-        print('222222222222222',len(list(m.parameters())))
-        print(list(m.parameters()))
+        print('222222222222222',len(list(self.net.parameters())))
+        print(list(self.net.parameters()))
         print(self.net.dp1)
         self.net.to(self.device)
 
