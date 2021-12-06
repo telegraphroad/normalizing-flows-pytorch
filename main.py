@@ -45,9 +45,9 @@ class Model(object):
         self.name = cfg.network.name
         self.dims = dims
         self.dimension = np.prod(dims)
-        self._var_base_dist = dist_args['variable']
+        self._var_base_dist = dist_args['variable_bd']
 
-        if dist_args['family'] == 'mvn':
+        if dist_args['bd_family'] == 'mvn':
 
             self.mu = nn.Parameter(torch.zeros((self.dimension, dtype=torch.float32)).to(self.device) + dist_args['mu']).to(self.device)
             self.covar = nn.Parameter(torch.eye((self.dimension, dtype=torch.float32)).to(self.device) + dist_args['cov']).to(self.device)
@@ -320,7 +320,7 @@ def main(cfg):
 
 
     # setup train/eval model
-    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg)
+    model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd=True, mu = 0., cov = 0.)
 
     # summary writer
     writer = SummaryWriter('./')
