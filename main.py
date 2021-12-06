@@ -675,13 +675,14 @@ class Model(object):
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
             
         elif dist_args['bd_family'] == 'ggd':
-            self.loc = torch.nn.Parameter(torch.zeros(()) + dist_args['loc']).to(self.device)
-            self.scale = torch.nn.Parameter(torch.zeros(()) + dist_args['scale']).to(self.device)
-            self.p = torch.nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device)
-            self.loc.requires_grad = True
-            self.scale.requires_grad = True
-            self.p.requires_grad = True
+            self.loc = torch.nn.Parameter(torch.zeros(()) + dist_args['loc'], requires_grad = True).to(self.device)
+            self.scale = torch.nn.Parameter(torch.zeros(()) + dist_args['scale'], requires_grad = True).to(self.device)
+            self.p = torch.nn.Parameter(torch.zeros(()) + dist_args['p'], requires_grad = True).to(self.device)
+            #self.loc.requires_grad = True
+            #self.scale.requires_grad = True
+            #self.p.requires_grad = True
             self.base_distribution = GenNormal(loc=self.loc,scale=self.scale,p=self.p)
+            print(self.loc,self.scale,self.p)
             
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
