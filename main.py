@@ -677,7 +677,7 @@ class Model(object):
         elif dist_args['bd_family'] == 'ggd':
             self.loc = nn.Parameter(torch.zeros(()) + dist_args['loc']).to(self.device)
             self.scale = nn.Parameter(torch.zeros(()) + dist_args['scale']).to(self.device)
-            self.p = nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device))
+            self.p = nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device)
             self.loc.requires_grad = True
             self.scale.requires_grad = True
             self.p.requires_grad = True
