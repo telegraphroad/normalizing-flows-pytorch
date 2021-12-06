@@ -57,8 +57,8 @@ class Model(object):
                 self.mu.requires_grad = True
                 self.covar.requires_grad = True
             else:
-                self.mu.requires_grad = False
-                self.covar.requires_grad = False
+                self.mu.requires_grad = True
+                self.covar.requires_grad = True
                 
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
             
