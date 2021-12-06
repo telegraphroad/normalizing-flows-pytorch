@@ -684,7 +684,7 @@ class Model(object):
             #self.loc.requires_grad = True
             #self.scale.requires_grad = True
             #self.p.requires_grad = True
-            print('pshape',p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
+            print('pshape',self.p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
             self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
             print(self.loc,self.scale,self.p)
             
