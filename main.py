@@ -92,10 +92,10 @@ class GenNormal(ExponentialFamily):
         print('shape',shape)
         ipower = 1.0 / self.p
         
-        ipower = ipower.mean().cpu()
+        ipower = ipower.mean()#.cpu()
         gamma_dist = torch.distributions.Gamma(ipower, 1.0)
         
-        gamma_sample = gamma_dist.rsample(shape).cpu()
+        gamma_sample = gamma_dist.rsample(shape)#.cpu()
         
         binary_sample = torch.randint(low=0, high=2, size=shape, dtype=self.loc.dtype) * 2 - 1
         
@@ -107,8 +107,9 @@ class GenNormal(ExponentialFamily):
         print('~~~',binary_sample.shape,gamma_sample.shape)
         sampled = binary_sample * torch.pow(torch.abs(gamma_sample), ipower)
         
-        print(self.loc.item(),':::::',self.scale.item(),':::::',self.p.item())
-        return self.loc.to(device) + self.scale.to(device) * sampled.to(device)
+        print(self.loc.detach().cpu().numpy(),':::::',self.scale.detach().cpu().numpy(),':::::',self.p.detach().cpu().numpy())
+        #return self.loc.to(device) + self.scale.to(device) * sampled.to(device)
+        return self.loc + self.scale * sampled
 
     def sample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
