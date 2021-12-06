@@ -680,10 +680,11 @@ class Model(object):
         elif dist_args['bd_family'] == 'ggd':
             self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32) + dist_args['loc'], requires_grad = True).to(self.device)
             self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32) + dist_args['scale'], requires_grad = True).to(self.device)
-            self.p = torch.nn.Parameter(torch.zeros(()) + dist_args['p'], requires_grad = True).to(self.device)
+            self.p = torch.nn.Parameter(torch.zeros(1) + dist_args['p'], requires_grad = True).to(self.device)
             #self.loc.requires_grad = True
             #self.scale.requires_grad = True
             #self.p.requires_grad = True
+            print('pshape',p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
             self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
             print(self.loc,self.scale,self.p)
             
