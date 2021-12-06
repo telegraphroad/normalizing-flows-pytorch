@@ -365,7 +365,7 @@ def main(cfg):
             save_files = step % (cfg.run.display * 1000) == 0
             model.report(writer, y, step=step, save_files=save_files)
             writer.flush()
-            print(model.mu.detach().cpu().numpy(),model.cov.detach().cpu().numpy())
+            print(model.mu.detach().cpu().numpy(),model.covar.detach().cpu().numpy())
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
