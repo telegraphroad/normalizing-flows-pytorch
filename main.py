@@ -991,7 +991,7 @@ def main(cfg):
             save_files = step % (cfg.run.display * 1000) == 0
             model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
             writer.flush()
-            print(model.loc.detach().cpu().numpy(),model.scale.detach().cpu().numpy(),,model.p.detach().cpu().numpy())
+            print(model.loc.detach().cpu().numpy(),model.scale.detach().cpu().numpy(),model.p.detach().cpu().numpy())
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
