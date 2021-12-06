@@ -977,81 +977,87 @@ class Model(object):
 @hydra.main(config_path='configs', config_name='default')
 def main(cfg):
     # show parameters
+    ddistrib = 'ggd'
     print('***** parameters ****')
     print(OmegaConf.to_yaml(cfg))
     print('*********************')
     print('')
+    ddim = 2
+    for vprior in ['ggd','mvn','ggd']:
+        for vvariable in [True]:
+            for vnbeta in [2.]:
+                for vdbeta in [0.5, 1.2, 2., 2.8, 3.5]:
+                # dataset
+                    if ddistrib != 'ggd':
+                        dataset = FlowDataLoader(ddistrib,
+                                                 batch_size=cfg.train.samples,
+                                                 total_steps=cfg.train.steps,
+                                                 shuffle=True)
+                    else:
+                        dataset = FlowDataLoader(ddistrib,
+                                                     batch_size=cfg.train.samples,
+                                                     total_steps=cfg.train.steps,
+                                                     shuffle=True, beta = vdbeta, dim = ddim)
 
-    # dataset
-    if cfg.run.distrib != 'ggd':
-    	dataset = FlowDataLoader(cfg.run.distrib,
-        	                     batch_size=cfg.train.samples,
-                	             total_steps=cfg.train.steps,
-                        	     shuffle=True)
-    else:
-        dataset = FlowDataLoader(cfg.run.distrib,
-                                     batch_size=cfg.train.samples,
-                                     total_steps=cfg.train.steps,
-                                     shuffle=True, beta = cfg.run.beta, dim = cfg.run.dim)
 
+                    # setup train/eval model
+                    if vprior == 'mvn':
+                        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1.)
+                    elif vprior == 'ggd':
+                        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim)
+                    elif vprior == 'mvggd':
+                        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim)
 
-    # setup train/eval model
-    if cfg.run.prior == 'mvn':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = cfg.run.variable, mu = 0., cov = 1.)
-    elif cfg.run.prior == 'ggd':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = cfg.run.variable, loc = 0., scale = 1., p = cfg.run.nbeta, dim = cfg.run.dim)
-    elif cfg.run.prior == 'mvggd':
-        model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = cfg.run.variable, loc = 0., scale = 1., p = cfg.run.nbeta, dw=1., dim = cfg.run.dim)
+                    # summary writer
+                    writer = SummaryWriter('./')
 
-    # summary writer
-    writer = SummaryWriter('./')
+                    # CuDNN backends
+                    if cfg.run.debug:
+                        torch.backends.cudnn.deterministic = True
+                        torch.backends.cudnn.benchmark = False
+                        torch.autograd.set_detect_anomaly(True)
+                        for submodule in model.net.modules():
+                            submodule.register_forward_hook(anomaly_hook)
 
-    # CuDNN backends
-    if cfg.run.debug:
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        torch.autograd.set_detect_anomaly(True)
-        for submodule in model.net.modules():
-            submodule.register_forward_hook(anomaly_hook)
+                    else:
+                        torch.backends.cudnn.benchmark = True
 
-    else:
-        torch.backends.cudnn.benchmark = True
+                    # resume from checkpoint
+                    start_step = 0
+                    if cfg.run.ckpt_path is not None:
+                        start_step = model.load_ckpt(cfg.run.ckpt_path)
 
-    # resume from checkpoint
-    start_step = 0
-    if cfg.run.ckpt_path is not None:
-        start_step = model.load_ckpt(cfg.run.ckpt_path)
+                    # training
+                    step = start_step
+                    for data in dataset:
+                        # training
+                        model.train()
+                        start_time = time.perf_counter()
+                        y = data
+                        z, loss = model.train_on_batch(y)
+                        elapsed_time = time.perf_counter() - start_time
 
-    # training
-    step = start_step
-    for data in dataset:
-        # training
-        model.train()
-        start_time = time.perf_counter()
-        y = data
-        z, loss = model.train_on_batch(y)
-        elapsed_time = time.perf_counter() - start_time
+                        # update for the next step
+                        step += 1
 
-        # update for the next step
-        step += 1
+                        # reports
+                        if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
+                            # logging
+                            logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
+                                        (step, cfg.train.steps, loss.item(), elapsed_time))
 
-        # reports
-        if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
-            # logging
-            logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
-                        (step, cfg.train.steps, loss.item(), elapsed_time))
+                        if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
+                            writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
+                            save_files = step % (cfg.run.display * 1000) == 0
+                            model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
+                            writer.flush()
+                            print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
-        if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
-            writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
-            save_files = step % (cfg.run.display * 1000) == 0
-            model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
-            writer.flush()
-            print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
-
-        if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
-            # save ckpt
-            ckpt_file = cfg.run.mname + 'latest.pth'
-            model.save_ckpt(step, ckpt_file)
+                        if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
+                            # save ckpt
+                            
+                            ckpt_file = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + 'latest.pth'
+                            model.save_ckpt(step, ckpt_file)
 
 
 if __name__ == '__main__':
