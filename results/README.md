@@ -13,7 +13,7 @@ Results
 
 | Target | Reproduced | Training |
 |:--------:|:------------:|:----:|
-| ![](./density/realnvpggd/y_data_010000.jpg) | ![](./density/realnvpggd/y_sample_010000.jpg) | ![](./density/realnvpggd/movie.gif) |
+| ![](./density/realnvpggd/y_data_latest.jpg) | ![](./density/realnvpggd/y_sample_latest.jpg) | ![](./density/realnvpggd/movie.gif) |
 
 
 ### Glow
