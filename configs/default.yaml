@@ -7,8 +7,8 @@ network:
   layers: 32
 
 train:
-  steps: 100000
-  samples: 1024
+  steps: 10000
+  samples: 16384
 
 optimizer:
   name: adam
@@ -16,16 +16,16 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
   weight_decay: 0.0
-  decay_steps: 10000
+  decay_steps: 1000
   decay_ratio: 0.5
 
 run:
   gpu: 0
-  debug: False
-  distrib: circles
+  debug: True
+  distrib: ggd
   ckpt_path: null
   output: outputs
   display: 1
 
 defaults:
-  - network: realnvp
+  - network: glow

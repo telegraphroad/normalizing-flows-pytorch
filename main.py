@@ -293,10 +293,17 @@ def main(cfg):
     print('')
 
     # dataset
-    dataset = FlowDataLoader(cfg.run.distrib,
-                             batch_size=cfg.train.samples,
-                             total_steps=cfg.train.steps,
-                             shuffle=True)
+    if cfg.run.distrib != 'ggd':
+    	dataset = FlowDataLoader(cfg.run.distrib,
+        	                     batch_size=cfg.train.samples,
+                	             total_steps=cfg.train.steps,
+                        	     shuffle=True)
+    else:
+        dataset = FlowDataLoader(cfg.run.distrib,
+                                     batch_size=cfg.train.samples,
+                                     total_steps=cfg.train.steps,
+                                     shuffle=True, beta = cfg.run.beta, dim = cfg.run.dim)
+
 
     # setup train/eval model
     model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg)

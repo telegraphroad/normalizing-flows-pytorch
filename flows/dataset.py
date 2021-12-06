@@ -6,7 +6,7 @@ import torch
 import torchvision
 import sklearn.datasets
 from torchvision import transforms
-
+from scipy.stats import gennorm
 N_DATASET_SIZE = 65536
 
 
@@ -20,6 +20,8 @@ def _sample_moons(n):
     samples = (samples - 0.5) / 2.0
     return samples
 
+def _sample_ggd(n, beta, dim):
+    return gennorm(beta=beta).rvs(size=[n,dim])
 
 def _sample_normals(n):
     radius = 0.7
@@ -51,7 +53,7 @@ def _sample_s_curve(n):
 
 
 class FlowDataLoader(object):
-    def __init__(self, name='moons', batch_size=1024, total_steps=100000, shuffle=True):
+    def __init__(self, name='moons', batch_size=1024, total_steps=100000, shuffle=True, **args):
         super(FlowDataLoader, self).__init__()
         self.name = name
         self.batch_size = batch_size
@@ -60,6 +62,8 @@ class FlowDataLoader(object):
 
         self.iter = 0
         self.indices = None
+        self._args = args
+
         self._initialize()
 
     def _initialize(self):
@@ -81,6 +85,11 @@ class FlowDataLoader(object):
             self.dset = _sample_circles(N_DATASET_SIZE)
             self.dims = (2, )
             self.dtype = '2d'
+        elif self.name == 'ggd':
+            self.dset = _sample_ggd(N_DATASET_SIZE,self._args['beta'],self._args['dim'])
+            self.dims = (self._args['dim'], )
+            self.dtype = str(self._args['dim']) + 'd'
+
         elif self.name == 'moons':
             self.dset = _sample_moons(N_DATASET_SIZE)
             self.dims = (2, )
