@@ -26,7 +26,7 @@ from scipy.stats import gennorm
 import pandas as pd
 import numpy as np
 import torch
-from torch.distributions import ExponentialFamily,Categorical,constraints,MultivariateNormal
+from torch.distributions import ExponentialFamily,Categorical,constraints,MultivariateNormal, Independent
 from torch.distributions.utils import _standard_normal,broadcast_all
 from numbers import Real, Number
 import math
@@ -681,7 +681,7 @@ class Model(object):
             #self.loc.requires_grad = True
             #self.scale.requires_grad = True
             #self.p.requires_grad = True
-            self.base_distribution = GenNormal(loc=self.loc,scale=self.scale,p=self.p)
+            self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
             print(self.loc,self.scale,self.p)
             
 
