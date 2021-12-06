@@ -716,7 +716,7 @@ class Model(object):
 
         z, log_det_jacobian = self.net(y)
         z = z.view(y.size(0), -1)
-
+        print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
         loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
 
         self.optim.zero_grad()
