@@ -675,9 +675,9 @@ class Model(object):
             self.base_distribution = MultivariateNormal(self.mu, self.covar)
             
         elif dist_args['bd_family'] == 'ggd':
-            self.loc = nn.Parameter(torch.zeros(()) + dist_args['loc']).to(self.device)
-            self.scale = nn.Parameter(torch.zeros(()) + dist_args['scale']).to(self.device)
-            self.p = nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device)
+            self.loc = torch.nn.Parameter(torch.zeros(()) + dist_args['loc']).to(self.device)
+            self.scale = torch.nn.Parameter(torch.zeros(()) + dist_args['scale']).to(self.device)
+            self.p = torch.nn.Parameter(torch.zeros(()) + dist_args['p']).to(self.device)
             self.loc.requires_grad = True
             self.scale.requires_grad = True
             self.p.requires_grad = True
