@@ -1043,7 +1043,7 @@ def main(cfg):
             save_files = step % (cfg.run.display * 1000) == 0
             model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
             writer.flush()
-            print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy(),model.net.dp4.detach().cpu().numpy())
+            print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
             # save ckpt
