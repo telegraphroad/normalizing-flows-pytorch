@@ -89,6 +89,7 @@ class GenNormal(ExponentialFamily):
     def rsample(self, sample_shape=torch.Size()):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         shape = self._extended_shape(sample_shape)
+        print('shape,'shape_
         ipower = 1.0 / self.p
         ipower = ipower.cpu()
         gamma_dist = torch.distributions.Gamma(ipower, 1.0)
@@ -97,7 +98,8 @@ class GenNormal(ExponentialFamily):
         
         binary_sample = torch.randint(low=0, high=2, size=shape, dtype=self.loc.dtype) * 2 - 1
         
-        
+        print('~~~~~~',binary_sample.shape,gamma_sample.shape)
+              
         if len(binary_sample.shape) ==  len(gamma_sample.shape) - 1:
             gamma_sample = gamma_sample.squeeze(len(gamma_sample.shape) - 1)
             
