@@ -89,7 +89,7 @@ class GenNormal(ExponentialFamily):
     def rsample(self, sample_shape=torch.Size()):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         shape = self._extended_shape(sample_shape)
-        print('shape,'shape_
+        print('shape',shape)
         ipower = 1.0 / self.p
         ipower = ipower.cpu()
         gamma_dist = torch.distributions.Gamma(ipower, 1.0)
