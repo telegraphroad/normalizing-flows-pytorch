@@ -26,10 +26,10 @@ def scatter_plot(xs, ys, zs=None, colors=None, title=None):
         ax.set_zticks(np.linspace(-1, 1, 5))
         scatter = ax.scatter(xs, ys, zs, c=colors, cmap='jet')  #, vmin=0.0, vmax=5.0)
 
-    ax.set_xlim([-1, 1])
-    ax.set_xticks(np.linspace(-1, 1, 5))
-    ax.set_ylim([-1, 1])
-    ax.set_yticks(np.linspace(-1, 1, 5))
+#     ax.set_xlim([-1, 1])
+#     ax.set_xticks(np.linspace(-1, 1, 5))
+#     ax.set_ylim([-1, 1])
+#     ax.set_yticks(np.linspace(-1, 1, 5))
 
     if title is not None:
         plt.title(title)
