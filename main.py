@@ -49,8 +49,8 @@ class Model(object):
 
         if dist_args['bd_family'] == 'mvn':
 
-            self.mu = nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu']).to(self.device)
-            self.covar = nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov']).to(self.device)
+            self.mu = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu']).to(self.device)
+            self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov']).to(self.device)
 
             if self._var_base_dist == True:
                 self.mu.requires_grad = True
