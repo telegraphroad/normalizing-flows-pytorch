@@ -89,7 +89,7 @@ class GenNormal(ExponentialFamily):
     def rsample(self, sample_shape=torch.Size()):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         shape = self._extended_shape(sample_shape)
-        print('shape',shape)
+        #print('shape',shape)
         ipower = 1.0 / self.p
         
         ipower = ipower.mean()#.cpu()
@@ -99,12 +99,12 @@ class GenNormal(ExponentialFamily):
         
         binary_sample = torch.randint(low=0, high=2, size=shape, dtype=self.loc.dtype) * 2 - 1
         
-        print('~~~~~~',binary_sample.shape,gamma_sample.shape)
+        #print('~~~~~~',binary_sample.shape,gamma_sample.shape)
               
         if len(binary_sample.shape) ==  len(gamma_sample.shape) - 1:
             gamma_sample = gamma_sample.squeeze(len(gamma_sample.shape) - 1)
             
-        print('~~~',binary_sample.shape,gamma_sample.shape)
+        #print('~~~',binary_sample.shape,gamma_sample.shape)
         sampled = binary_sample.to(device) * torch.pow(torch.abs(gamma_sample).to(device), ipower)
         
         print(self.loc.detach().cpu().numpy(),':::::',self.scale.detach().cpu().numpy(),':::::',self.p.detach().cpu().numpy())
@@ -685,9 +685,9 @@ class Model(object):
             #self.loc.requires_grad = True
             #self.scale.requires_grad = True
             #self.p.requires_grad = True
-            print('pshape',self.p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
+            #print('pshape',self.p.shape,GenNormal(loc=self.loc,scale=self.scale,p=self.p))
             self.base_distribution = Independent(GenNormal(loc=self.loc,scale=self.scale,p=self.p),1)
-            print(self.loc,self.scale,self.p)
+            #print(self.loc,self.scale,self.p)
             
 
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
@@ -721,7 +721,7 @@ class Model(object):
 
         z, log_det_jacobian = self.net(y)
         z = z.view(y.size(0), -1)
-        print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
+        #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
         loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
 
         self.optim.zero_grad()
