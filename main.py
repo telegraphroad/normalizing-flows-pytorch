@@ -1059,7 +1059,7 @@ def main(cfg):
                             ckpt_file = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + 'latest.pth'
                             model.save_ckpt(step, ckpt_file)
 
-    for vprior in ['ggd','mvn','ggd']:
+    for vprior in ['ggd','mvn','mvggd']:
         for vvariable in [False]:
             for vnbeta in [0.5, 1.2, 2., 2.8, 3.5]:
                 for vdbeta in [0.5, 1.2, 2., 2.8, 3.5]:
