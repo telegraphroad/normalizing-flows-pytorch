@@ -818,7 +818,7 @@ class Model(object):
     def pz(self, z):
         return torch.exp(self.log_pz(z))
 
-    def report(self, writer, y_data, step=0, save_files=False):
+    def report(self, writer, y_data, step=0, save_files=False,prefix=''):
         # set to evaluation mode
         self.net.eval()
 
@@ -847,7 +847,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_data_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
-                latest_file = 'y_data_latest.jpg'
+                latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
             # plot latent samples
@@ -866,7 +866,7 @@ class Model(object):
             if save_image:
                 out_file = 'z_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, z_image)
-                latest_file = 'z_sample_latest.jpg'
+                latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
             # save plot
@@ -882,7 +882,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
-                latest_file = 'y_sample_latest.jpg'
+                latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
             # 2D visualization
@@ -906,7 +906,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_dist_{:06d}.jpg'.format(step)
                 save_image(out_file, map_image)
-                latest_file = 'y_dist_latest.jpg'
+                latest_file = prefix + 'y_dist_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
         if dtype == '3d':
@@ -925,7 +925,7 @@ class Model(object):
             if save_image:
                 out_file = 'z_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, z_image)
-                latest_file = 'z_sample_latest.jpg'
+                latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
             # save plot
@@ -942,7 +942,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
-                latest_file = 'y_sample_latest.jpg'
+                latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
         if dtype == 'image':
@@ -955,7 +955,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_data_{:06d}.jpg'.format(step)
                 save_image(out_file, grid_image)
-                latest_file = 'y_data_latest.jpg'
+                latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
             # sample with generative flow
@@ -970,7 +970,7 @@ class Model(object):
             if save_image:
                 out_file = 'y_image_{:06d}.jpg'.format(step)
                 save_image(out_file, grid_image)
-                latest_file = 'y_image_latest.jpg'
+                latest_file = prefix + 'y_image_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
 
@@ -1036,7 +1036,7 @@ def main(cfg):
                         y = data
                         z, loss = model.train_on_batch(y)
                         elapsed_time = time.perf_counter() - start_time
-
+                        prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_'
                         # update for the next step
                         step += 1
 
@@ -1049,14 +1049,14 @@ def main(cfg):
                         if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
                             writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
                             save_files = step % (cfg.run.display * 1000) == 0
-                            model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files)
+                            model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix)
                             writer.flush()
                             print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
                         if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
                             # save ckpt
                             
-                            ckpt_file = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + 'latest.pth'
+                            ckpt_file = prefix + 'latest.pth'
                             model.save_ckpt(step, ckpt_file)
 
     for vprior in ['ggd','mvn','mvggd']:
