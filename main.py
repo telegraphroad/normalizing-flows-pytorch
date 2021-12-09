@@ -860,7 +860,7 @@ class Model(object):
             writer.add_image('2d/data/y', y_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_data_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_data_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
                 latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -879,7 +879,7 @@ class Model(object):
             writer.add_image('2d/train/z', z_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'z_sample_{:06d}.jpg'.format(step)
+                out_file = prefix + 'z_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, z_image)
                 latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -895,7 +895,7 @@ class Model(object):
             writer.add_image('2d/test/y', y_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_sample_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
                 latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -919,7 +919,7 @@ class Model(object):
             writer.add_image('2d/test/map', map_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_dist_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_dist_{:06d}.jpg'.format(step)
                 save_image(out_file, map_image)
                 latest_file = prefix + 'y_dist_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -938,7 +938,7 @@ class Model(object):
             writer.add_image('3d/train/z', z_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'z_sample_{:06d}.jpg'.format(step)
+                out_file = prefix + 'z_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, z_image)
                 latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -955,7 +955,7 @@ class Model(object):
             writer.add_image('3d/test/y', y_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_sample_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_sample_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
                 latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -968,7 +968,7 @@ class Model(object):
             writer.add_image('image/test/data', grid_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_data_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_data_{:06d}.jpg'.format(step)
                 save_image(out_file, grid_image)
                 latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
@@ -983,7 +983,7 @@ class Model(object):
             writer.add_image('image/test/sample', grid_image, step, dataformats='HWC')
 
             if save_image:
-                out_file = 'y_image_{:06d}.jpg'.format(step)
+                out_file = prefix + 'y_image_{:06d}.jpg'.format(step)
                 save_image(out_file, grid_image)
                 latest_file = prefix + 'y_image_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
