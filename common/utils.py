@@ -56,7 +56,7 @@ def image_plot(image,
     canvas = FigureCanvas(fig)
 
     ax = fig.add_subplot(111)
-    im = ax.imshow(image, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
+    im = ax.imshow(image, cmap=cmap, extent=extent)#, vmin=vmin, vmax=vmax)
     if colorbar:
         plt.colorbar(im)
 
