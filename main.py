@@ -660,6 +660,7 @@ class Model(object):
             self.device = torch.device('cpu')
 
         self.name = cfg.network.name
+        self._batch_size = cfg.train.samples
         self.dims = dims
         self.dimension = np.prod(dims)
         self._var_base_dist = dist_args['variable_bd']
@@ -777,7 +778,7 @@ class Model(object):
             weights = torch.exp(diff - diff.max())
             prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
             prob = torch.greater(prob, 0.5).float()
-            F = 1 - prob.sum(1) / cfg.train.samples
+            F = 1 - prob.sum(1) / self._batch_size
             gammas = F ** beta
             gammas /= gammas.sum()
             loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
