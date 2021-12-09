@@ -998,7 +998,7 @@ def main(cfg):
     print('*********************')
     print('')
     ddim = 2
-    for loss in ['TA','ML']:
+    for loss_type in ['TA','ML']:
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
                 for vnbeta in [2.]:
@@ -1018,11 +1018,11 @@ def main(cfg):
 
                         # setup train/eval model
                         if vprior == 'mvn':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
                         elif vprior == 'ggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
                         elif vprior == 'mvggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
 
                         # summary writer
                         writer = SummaryWriter('./')
@@ -1052,7 +1052,7 @@ def main(cfg):
                             y = data
                             z, loss = model.train_on_batch(y)
                             elapsed_time = time.perf_counter() - start_time
-                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss + '_'
+                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
                             # update for the next step
                             step += 1
 
@@ -1094,11 +1094,11 @@ def main(cfg):
 
                         # setup train/eval model
                         if vprior == 'mvn':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
                         elif vprior == 'ggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
                         elif vprior == 'mvggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss)
+                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
 
                         # summary writer
                         writer = SummaryWriter('./')
@@ -1122,7 +1122,7 @@ def main(cfg):
                         # training
                         step = start_step
                         for data in dataset:
-                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss + '_'
+                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
                             # training
                             model.train()
                             start_time = time.perf_counter()
