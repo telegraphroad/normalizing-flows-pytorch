@@ -861,7 +861,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'y_data_{:06d}.jpg'.format(step)
-                save_image(out_file, y_image)
+                save_image(prefix + out_file, y_image)
                 latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -880,7 +880,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'z_sample_{:06d}.jpg'.format(step)
-                save_image(out_file, z_image)
+                save_image(prefix + out_file, z_image)
                 latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -896,7 +896,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'y_sample_{:06d}.jpg'.format(step)
-                save_image(out_file, y_image)
+                save_image(prefix + out_file, y_image)
                 latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -915,12 +915,12 @@ class Model(object):
             py = py.detach().cpu().numpy()
             py_map = py.reshape((map_size, map_size))
 
-            map_image = image_plot(py_map, title=title, extent=[-1, 1, -1, 1])
+            map_image = image_plot(py_map, title=title)#, extent=[-1, 1, -1, 1])
             writer.add_image('2d/test/map', map_image, step, dataformats='HWC')
 
             if save_image:
                 out_file = 'y_dist_{:06d}.jpg'.format(step)
-                save_image(out_file, map_image)
+                save_image(prefix + out_file, map_image)
                 latest_file = prefix + 'y_dist_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -939,7 +939,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'z_sample_{:06d}.jpg'.format(step)
-                save_image(out_file, z_image)
+                save_image(prefix + out_file, z_image)
                 latest_file = prefix + 'z_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -956,7 +956,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'y_sample_{:06d}.jpg'.format(step)
-                save_image(out_file, y_image)
+                save_image(prefix + out_file, y_image)
                 latest_file = prefix + 'y_sample_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -969,7 +969,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'y_data_{:06d}.jpg'.format(step)
-                save_image(out_file, grid_image)
+                save_image(prefix + out_file, grid_image)
                 latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
@@ -984,7 +984,7 @@ class Model(object):
 
             if save_image:
                 out_file = 'y_image_{:06d}.jpg'.format(step)
-                save_image(out_file, grid_image)
+                save_image(prefix + out_file, grid_image)
                 latest_file = prefix + 'y_image_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
 
