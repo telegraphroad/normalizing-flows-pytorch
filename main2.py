@@ -36,8 +36,9 @@ import copy
 from torch.distributions import MultivariateNormal
 
 
-def get_sgd_covariance_full(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
-    """ Returns the per-sample SGD noise covariance matrix. Works when number of parameters is not large.
+@utils.with_no_grad
+def get_sgd_covariance_diagonal(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
+    """ Returns the diagonal of the per-sample SGD noise covariance matrix.
     The formula is \Sigma = \frac{1}{n} \sum_{i=1}^n g_i g_i^T - \bar{g} \bar{g}^T, where g_i is the gradient
     corresponding to the ith example and \bar{g} is the total gradient. Note that we can ignore weight decay here,
     as adding weight decay doesn't change the SGD noise covariance matrix.
@@ -53,9 +54,8 @@ def get_sgd_covariance_full(model, dataset, cpu=True, max_num_examples=2**30, nu
     loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
                         batch_size=1, shuffle=False, num_workers=num_workers)
 
-    n_params = utils.get_num_parameters(model)
-    avg_grad = torch.zeros((n_params,), dtype=torch.float, device=torch.device('cpu'))
-    sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=torch.device('cpu'))
+    grad_sum = defaultdict(lambda: None)
+    grad_squared_sum = defaultdict(lambda: None)
 
     # loop over the dataset
     for inputs_batch, labels_batch in tqdm(loader, desc='Computing sgd noise covariance...'):
@@ -74,15 +74,22 @@ def get_sgd_covariance_full(model, dataset, cpu=True, max_num_examples=2**30, nu
         if cpu:
             grad = [utils.to_cpu(v) for v in grad]
 
-        grad_flat = [v.flatten() for v in grad]
-        grad_flat = torch.cat(grad_flat, dim=0)
+        for (k, _), v in zip(model.named_parameters(), grad):
+            if grad_sum[k] is None:
+                grad_sum[k] = v
+            else:
+                grad_sum[k] += v
 
-        avg_grad += 1.0 / n_examples * grad_flat
-        sigma += 1.0 / n_examples * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
+            if grad_squared_sum[k] is None:
+                grad_squared_sum[k] = v**2
+            else:
+                grad_squared_sum[k] += v**2
 
-    sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
+    out = dict()
+    for k in grad_sum.keys():
+        out[k] = grad_squared_sum[k] / n_examples - (grad_sum[k] / n_examples) ** 2
 
-    return sigma
+    return out
 
 class GenNormal(ExponentialFamily):
     r"""
@@ -838,7 +845,7 @@ class Model(object):
         loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
-        print('gn',get_sgd_covariance_full(self.net, y, cpu=False, max_num_examples=2**30))
+        print('gn',get_sgd_covariance_diagonal(self.net, y, cpu=True, max_num_examples=2**30))
 
         return z, loss
 
