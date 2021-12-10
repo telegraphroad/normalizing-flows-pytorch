@@ -1004,7 +1004,7 @@ def main(cfg):
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
                 for vnbeta in [2.]:
-                    for vdbeta in [0.5, 1.2, 2., 2.8, 3.5]:
+                    for vdbeta in [1.2, 2., 2.8]:
                     # dataset
                         if ddistrib != 'ggd':
                             dataset = FlowDataLoader(ddistrib,
@@ -1079,8 +1079,8 @@ def main(cfg):
 
         for vprior in ['ggd','mvn','mvggd']:
             for vvariable in [False]:
-                for vnbeta in [0.5, 1.2, 2., 2.8, 3.5]:
-                    for vdbeta in [0.5, 1.2, 2., 2.8, 3.5]:
+                for vnbeta in [1.2, 2., 2.8]:
+                    for vdbeta in [1.2, 2., 2.8]:
                     # dataset
                         if ddistrib != 'ggd':
                             dataset = FlowDataLoader(ddistrib,
