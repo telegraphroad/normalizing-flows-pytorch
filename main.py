@@ -772,10 +772,10 @@ class Model(object):
             loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
         elif self._loss == 'TA':
             beta = -1
-            #logp = self.base_distribution.log_prob(z)
-            logp = self.base_distribution.log_prob(y)
-            #logq = self.log_py(z)
-            logq = self.log_py(y)
+            logp = self.base_distribution.log_prob(z)
+            #logp = self.base_distribution.log_prob(y)
+            logq = self.log_py(z)
+            #logq = self.log_py(y)
             diff = logp - logq
             weights = torch.exp(diff - diff.max())
             prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
