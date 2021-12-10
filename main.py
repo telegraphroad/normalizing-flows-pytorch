@@ -1000,7 +1000,7 @@ def main(cfg):
     print('*********************')
     print('')
     ddim = 2
-    for loss_type in ['TA','ML']:
+    for loss_type in ['ML','TA']:
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
                 for vnbeta in [2.]:
