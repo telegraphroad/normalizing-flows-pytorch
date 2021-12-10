@@ -54,8 +54,8 @@ def get_sgd_covariance_full(model, dataset, cpu=True, max_num_examples=2**30, nu
                         batch_size=1, shuffle=False, num_workers=num_workers)
 
     n_params = utils.get_num_parameters(model)
-    avg_grad = torch.zeros((n_params,), dtype=torch.float, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-    sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+    avg_grad = torch.zeros((n_params,), dtype=torch.float, device=torch.device('cpu'))
+    sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=torch.device('cpu'))
 
     # loop over the dataset
     for inputs_batch, labels_batch in tqdm(loader, desc='Computing sgd noise covariance...'):
