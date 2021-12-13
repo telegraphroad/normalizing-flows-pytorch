@@ -909,8 +909,8 @@ class Model(object):
         self.schduler.step()
         with torch.no_grad():
             n_params = utils.get_num_parameters(self.net)
-            avg_grad = torch.zeros((n_params,), dtype=torch.float, device=('cpu' if cpu else model.device))
-            sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=('cpu' if cpu else model.device))
+            avg_grad = torch.zeros((n_params,), dtype=torch.float, device=(self.device))
+            sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=(self.device))
             grad = torch.autograd.grad(batch_total_loss, self.net.parameters())
             grad_flat = [v.flatten() for v in grad]
             grad_flat = torch.cat(grad_flat, dim=0)
