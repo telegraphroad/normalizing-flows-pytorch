@@ -901,13 +901,25 @@ class Model(object):
             gammas = F ** beta
             gammas /= gammas.sum()
             loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
-        print(get_sgd_covariance_diagonal(self, y, cpu=True, max_num_examples=2**30, num_workers=8, seed=42))
+        
 
         self.optim.zero_grad()
         loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
+        with torch.no_grad():
+            n_params = utils.get_num_parameters(self.net)
+            avg_grad = torch.zeros((n_params,), dtype=torch.float, device=('cpu' if cpu else model.device))
+            sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=('cpu' if cpu else model.device))
+            grad = torch.autograd.grad(batch_total_loss, self.net.parameters())
+            grad_flat = [v.flatten() for v in grad]
+            grad_flat = torch.cat(grad_flat, dim=0)
 
+            avg_grad += 1.0 / self._batch_size * grad_flat
+            sigma += 1.0 / self._batch_size * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
+
+            sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
+            print('sigma#########################',sigma)
         return z, loss
 
     def save_ckpt(self, step, filename):
