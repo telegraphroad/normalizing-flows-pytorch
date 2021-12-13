@@ -1,6 +1,6 @@
 import time
 import shutil
-
+import warnings
 import hydra
 import numpy as np
 import torch
@@ -8,6 +8,9 @@ import torchvision
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from torch.distributions.multivariate_normal import MultivariateNormal
+from torch import nn
+import torch.nn.functional as F
+from torch.distributions import MultivariateNormal
 
 from flows import MAF, Glow, Ffjord, Flowpp, RealNVP, ResFlow, PlanarFlow
 from flows.misc import anomaly_hook
@@ -16,8 +19,6 @@ from flows.dataset import FlowDataLoader
 from flows.modules import Logit, Identity
 from common.logging import Logging
 import torch.optim.lr_scheduler
-from torch.utils.data import Subset, DataLoader
-from nnlib.nnlib import utils
 
 
 from torch.distributions.normal import Normal
@@ -36,60 +37,6 @@ import copy
 from torch.distributions import MultivariateNormal
 
 
-@utils.with_no_grad
-def get_sgd_covariance_diagonal(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
-    """ Returns the diagonal of the per-sample SGD noise covariance matrix.
-    The formula is \Sigma = \frac{1}{n} \sum_{i=1}^n g_i g_i^T - \bar{g} \bar{g}^T, where g_i is the gradient
-    corresponding to the ith example and \bar{g} is the total gradient. Note that we can ignore weight decay here,
-    as adding weight decay doesn't change the SGD noise covariance matrix.
-    """
-    np.random.seed(seed)
-    model.eval()
-
-    if num_workers > 0:
-        torch.multiprocessing.set_sharing_strategy('file_system')
-        torch.multiprocessing.set_start_method('spawn', force=True)
-
-    n_examples = min(len(dataset), max_num_examples)
-    loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
-                        batch_size=1, shuffle=False, num_workers=num_workers)
-
-    grad_sum = defaultdict(lambda: None)
-    grad_squared_sum = defaultdict(lambda: None)
-
-    # loop over the dataset
-    for inputs_batch, labels_batch in tqdm(loader, desc='Computing sgd noise covariance...'):
-        if isinstance(inputs_batch, torch.Tensor):
-            inputs_batch = [inputs_batch]
-        if not isinstance(labels_batch, list):
-            labels_batch = [labels_batch]
-
-        with torch.set_grad_enabled(True):
-            outputs = model.forward(inputs=inputs_batch, labels=labels_batch, loader=loader, **kwargs)
-            batch_losses, outputs = model.compute_loss(inputs=inputs_batch, labels=labels_batch, outputs=outputs,
-                                                       loader=loader, dataset=loader.dataset)
-            batch_total_loss = sum([loss for name, loss in batch_losses.items()])
-
-        grad = torch.autograd.grad(batch_total_loss, model.parameters())
-        if cpu:
-            grad = [utils.to_cpu(v) for v in grad]
-
-        for (k, _), v in zip(model.named_parameters(), grad):
-            if grad_sum[k] is None:
-                grad_sum[k] = v
-            else:
-                grad_sum[k] += v
-
-            if grad_squared_sum[k] is None:
-                grad_squared_sum[k] = v**2
-            else:
-                grad_squared_sum[k] += v**2
-
-    out = dict()
-    for k in grad_sum.keys():
-        out[k] = grad_squared_sum[k] / n_examples - (grad_sum[k] / n_examples) ** 2
-
-    return out
 
 class GenNormal(ExponentialFamily):
     r"""
@@ -845,7 +792,6 @@ class Model(object):
         loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
-        print('gn',get_sgd_covariance_diagonal(self.net, y, cpu=True, max_num_examples=2**30))
 
         return z, loss
 
@@ -914,8 +860,8 @@ class Model(object):
             # plot data samples
             xs = y_data[:, 0].cpu().numpy()
             ys = y_data[:, 1].cpu().numpy()
-            
-            y_image = scatter_plot(xs, ys, title=title)
+            py = self.pz(y_data).detach().cpu().numpy() 
+            y_image = scatter_plot(xs, ys,colors=py, title=title)
             writer.add_image('2d/data/y', y_image, step, dataformats='HWC')
 
             if save_image:
@@ -944,7 +890,7 @@ class Model(object):
                 shutil.copyfile(out_file, latest_file)
 
             # save plot
-            y, py = self.sample_y(max(100, n_samples))
+            y, py = self.sample_y(max(1000, n_samples))
             y = y.detach().cpu().numpy()
             py = py.detach().cpu().numpy()
             xs = y[:, 0]
@@ -1003,7 +949,7 @@ class Model(object):
                 shutil.copyfile(out_file, latest_file)
 
             # save plot
-            y, py = self.sample_y(max(100, n_samples))
+            y, py = self.sample_y(max(1000, n_samples))
             y = y.detach().cpu().numpy()
             py = py.detach().cpu().numpy()
             xs = y[:, 0]
@@ -1048,9 +994,112 @@ class Model(object):
                 shutil.copyfile(out_file, latest_file)
 
 
+
+def compute_probs(data, n=10):
+    h, e = np.histogram(data, n)
+    p = h/data.shape[0]
+    return e, p
+
+def support_intersection(p, q):
+    sup_int = (
+        list(
+            filter(
+                lambda x: (x[0]!=0) & (x[1]!=0), zip(p, q)
+            )
+        )
+    )
+    return sup_int
+
+def get_probs(list_of_tuples):
+    p = np.array([p[0] for p in list_of_tuples])
+    q = np.array([p[1] for p in list_of_tuples])
+    return p, q
+
+def kl_divergence(p, q):
+    return np.sum(p*np.log(p/q))
+
+def js_divergence(p, q):
+    m = (1./2.)*(p + q)
+    return (1./2.)*kl_divergence(p, m) + (1./2.)*kl_divergence(q, m)
+
+def compute_kl_divergence(train_sample, test_sample, n_bins=50):
+    """
+    Computes the KL Divergence using the support 
+    intersection between two different samples
+    """
+    e, p = compute_probs(train_sample, n=n_bins)
+    _, q = compute_probs(test_sample, n=e)
+
+    list_of_tuples = support_intersection(p, q)
+    p, q = get_probs(list_of_tuples)
+
+    return kl_divergence(p, q)
+
+def compute_js_divergence(train_sample, test_sample, n_bins=50):
+    """
+    Computes the JS Divergence using the support 
+    intersection between two different samples
+    """
+    e, p = compute_probs(train_sample, n=n_bins)
+    _, q = compute_probs(test_sample, n=e)
+
+    list_of_tuples = support_intersection(p,q)
+    p, q = get_probs(list_of_tuples)
+
+    return js_divergence(p, q)
+
+
+def KLdivergence(x, y):
+  """Compute the Kullback-Leibler divergence between two multivariate samples.
+  Parameters
+  ----------
+  x : 2D array (n,d)
+    Samples from distribution P, which typically represents the true
+    distribution.
+  y : 2D array (m,d)
+    Samples from distribution Q, which typically represents the approximate
+    distribution.
+  Returns
+  -------
+  out : float
+    The estimated Kullback-Leibler divergence D(P||Q).
+  References
+  ----------
+  Pérez-Cruz, F. Kullback-Leibler divergence estimation of
+continuous distributions IEEE International Symposium on Information
+Theory, 2008.
+  """
+  from scipy.spatial import cKDTree as KDTree
+
+  # Check the dimensions are consistent
+  x = np.atleast_2d(x)
+  y = np.atleast_2d(y)
+
+  n,d = x.shape
+  m,dy = y.shape
+
+  assert(d == dy)
+
+
+  # Build a KD tree representation of the samples and find the nearest neighbour
+  # of each point in x.
+  xtree = KDTree(x)
+  ytree = KDTree(y)
+
+  # Get the first two nearest neighbours for x, since the closest one is the
+  # sample itself.
+  r = xtree.query(x, k=2, eps=.01, p=2)[0][:,1]
+  s = ytree.query(x, k=1, eps=.01, p=2)[0]
+
+  # There is a mistake in the paper. In Eq. 14, the right side misses a negative sign
+  # on the first term of the right hand side.
+  return -np.log(r/s).sum() * d / n + np.log(m / (n - 1.))
+
 @hydra.main(config_path='configs', config_name='default')
 def main(cfg):
     # show parameters
+    klds = []
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ddistrib = 'ggd'
     print('***** parameters ****')
     print(OmegaConf.to_yaml(cfg))
@@ -1060,8 +1109,8 @@ def main(cfg):
     for loss_type in ['ML','TA']:
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
-                for vnbeta in [2.]:
-                    for vdbeta in [1.2, 2., 2.8]:
+                for vnbeta in [2.]:#2.]:
+                    for vdbeta in [2.]:#,1.2, 2., 2.8,3.6]:
                     # dataset
                         if ddistrib != 'ggd':
                             dataset = FlowDataLoader(ddistrib,
@@ -1133,11 +1182,23 @@ def main(cfg):
 
                                 ckpt_file = prefix + 'latest.pth'
                                 model.save_ckpt(step, ckpt_file)
+                        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
+                        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
+                        qx = model.log_py(x)
+                        print('PX',px)
+                        print('QX',qx)
+                        #print(model.sample_y(20000).cpu().detach())
+                        y,_ = model.sample_y(20000)
+                        klds.append([F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta])
+                        print(klds)
+                        pd.DataFrame(klds).to_csv('./kld.csv')
 
-        for vprior in ['ggd','mvn','mvggd']:
+
+
+        for vprior in ['ggd','mvn']:#,'mvggd']:
             for vvariable in [False]:
-                for vnbeta in [1.2, 2., 2.8]:
-                    for vdbeta in [1.2, 2., 2.8]:
+                for vnbeta in []:#,1.2, 2., 2.8,3.6]:
+                    for vdbeta in [0.4,1.2, 2., 2.8,3.6]:
                     # dataset
                         if ddistrib != 'ggd':
                             dataset = FlowDataLoader(ddistrib,
@@ -1158,7 +1219,7 @@ def main(cfg):
                             model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
                         elif vprior == 'mvggd':
                             model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
-
+                        print('ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_')
                         # summary writer
                         writer = SummaryWriter('./')
 
@@ -1210,6 +1271,21 @@ def main(cfg):
 
                                 ckpt_file = prefix + 'latest.pth'
                                 model.save_ckpt(step, ckpt_file)
+                        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
+                        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
+                        qx = model.log_py(x)
+                        print('PX',px)
+                        print('QX',qx)
+                        #print(model.sample_y(20000).cpu().detach())
+                        y,_ = model.sample_y(20000)
+                        klds.append([F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta])
+                        print(klds)
+                        pd.DataFrame(klds).to_csv('./kld.csv')
+
+
+
+    pd.DataFrame(klds).to_csv('./kld.csv')
+
 
 if __name__ == '__main__':
     main()

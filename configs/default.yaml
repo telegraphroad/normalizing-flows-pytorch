@@ -7,21 +7,21 @@ network:
   layers: 32
 
 train:
-  steps: 1500
+  steps: 2000
   samples: 1024
 
 optimizer:
   name: adam
-  lr: 2.0e-4
+  lr: 4.0e-4
   beta1: 0.9
   beta2: 0.999
   weight_decay: 0.0
-  decay_steps: 300
+  decay_steps: 400
   decay_ratio: 0.5
 
 run:
   gpu: 0
-  debug: True
+  debug: False
   distrib: ggd
   ckpt_path: null
   output: outputs
