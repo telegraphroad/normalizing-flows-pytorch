@@ -1319,12 +1319,8 @@ def main(cfg):
                             y = data
                             z, loss = model.train_on_batch(y)
 
-                            
-
-                            for param in list(model.net.parameters()):
-                                print(param)
-                            
-                            grad = [param.grad.cpu().clone() for param in model.net.parameters()]
+                            print('------------------------------------------------------------------')                            
+                            grad = [param.grad.cpu().clone() for param in list(model.net.parameters())]
                             size = 1024
                             grads.append(grad)
                             sizes.append(size)
