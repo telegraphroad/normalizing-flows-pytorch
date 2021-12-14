@@ -1339,7 +1339,7 @@ def main(cfg):
                             flat_grads = torch.stack(flat_grads)
                             sgd_noise = (flat_grads-full_grads).cpu()
                             # Grad_noise = Flat_Grads-Exact_Grad
-                            print('------------------------------------------FG,SGN',full_grads, sgd_noise)    
+                            print('------------------------------------------FG,SGN', sgd_noise)    
                             
 
 
