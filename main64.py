@@ -1237,28 +1237,29 @@ def main(cfg):
                             y = data
                             z, loss = model.train_on_batch(y)
 
-                            #print('------------------------------------------------------------------')                            
-                            #grads, sizes = [], []
-                            grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
-                            size = 1024
-                            grads.append(grad)
-                            sizes.append(size)
-                            flat_grads = []
-                            for grad in grads:
-                                flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                            full_grads = torch.zeros(flat_grads[-1].shape)
-                            # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                            for g, s in zip(flat_grads, sizes):
-                                full_grads += g * s
-                            full_grads /= np.sum(sizes)
-                            gc.collect()
-                            flat_grads = torch.stack(flat_grads)
-                            sgd_noise = (flat_grads-full_grads).cpu()
-                            # Grad_noise = Flat_Grads-Exact_Grad
-                            #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                            if sgd_noise.sum().item()>0.:
-                                gn.append(get_tail_index(sgd_noise))
-                                #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+                            if step % (cfg.run.display * 10) == 0:
+                                #print('------------------------------------------------------------------')                            
+                                #grads, sizes = [], []
+                                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                                size = 1024
+                                grads.append(grad)
+                                sizes.append(size)
+                                flat_grads = []
+                                for grad in grads:
+                                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                                full_grads = torch.zeros(flat_grads[-1].shape)
+                                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                                for g, s in zip(flat_grads, sizes):
+                                    full_grads += g * s
+                                full_grads /= np.sum(sizes)
+                                gc.collect()
+                                flat_grads = torch.stack(flat_grads)
+                                sgd_noise = (flat_grads-full_grads).cpu()
+                                # Grad_noise = Flat_Grads-Exact_Grad
+                                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                                if sgd_noise.sum().item()>0.:
+                                    gn.append(get_tail_index(sgd_noise))
+                                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
                                 
                             
 
@@ -1365,28 +1366,29 @@ def main(cfg):
                             
                             
                             
-                            #print('------------------------------------------------------------------')                            
-                            #grads, sizes = [], []
-                            grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
-                            size = 1024
-                            grads.append(grad)
-                            sizes.append(size)
-                            flat_grads = []
-                            for grad in grads:
-                                flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                            full_grads = torch.zeros(flat_grads[-1].shape)
-                            # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                            for g, s in zip(flat_grads, sizes):
-                                full_grads += g * s
-                            full_grads /= np.sum(sizes)
-                            gc.collect()
-                            flat_grads = torch.stack(flat_grads)
-                            sgd_noise = (flat_grads-full_grads).cpu()
-                            # Grad_noise = Flat_Grads-Exact_Grad
-                            #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                            if sgd_noise.sum().item()>0.:
-                                gn.append(get_tail_index(sgd_noise))
-                                #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+                            if step % (cfg.run.display * 10) == 0:
+                                #print('------------------------------------------------------------------')                            
+                                #grads, sizes = [], []
+                                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                                size = 1024
+                                grads.append(grad)
+                                sizes.append(size)
+                                flat_grads = []
+                                for grad in grads:
+                                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                                full_grads = torch.zeros(flat_grads[-1].shape)
+                                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                                for g, s in zip(flat_grads, sizes):
+                                    full_grads += g * s
+                                full_grads /= np.sum(sizes)
+                                gc.collect()
+                                flat_grads = torch.stack(flat_grads)
+                                sgd_noise = (flat_grads-full_grads).cpu()
+                                # Grad_noise = Flat_Grads-Exact_Grad
+                                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                                if sgd_noise.sum().item()>0.:
+                                    gn.append(get_tail_index(sgd_noise))
+                                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
                             
                             
                             
