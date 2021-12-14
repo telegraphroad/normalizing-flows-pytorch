@@ -14,6 +14,10 @@ class PlanarTransform(nn.Module):
         u = torch.randn(1, self.dim) * 0.01
         w = torch.randn(1, self.dim) * 0.01
         b = torch.randn(1) * 0.01
+        self.dp1 = None
+        self.dp2 = None
+        self.dp3 = None
+        self.dp4 = None       
 
         self.register_parameter('u', nn.Parameter(u))
         self.register_parameter('w', nn.Parameter(w))
