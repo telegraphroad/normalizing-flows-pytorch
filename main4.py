@@ -106,6 +106,11 @@ def get_tail_index(sgd_noise):
     Y = X.sum(1)
     # X = X.cpu().clone(); Y = Y.cpu().clone()
     a = torch.log(torch.abs(Y)).mean()
+    print('1',a)
+    print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
+    print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
+    print('4',torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean())
+    print('5',torch.log(torch.abs(X[3*K2/4:,:])).mean())
     b = (torch.log(torch.abs(X[:K2/4,:])).mean()+torch.log(torch.abs(X[K2/4:K2/2,:])).mean()+torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean()+torch.log(torch.abs(X[3*K2/4:,:])).mean())/4
     alpha_hat = np.log(K1)/(a-b).item()
     return alpha_hat
