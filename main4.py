@@ -46,6 +46,7 @@ import numpy as np
 
 from nnlib.nnlib import utils
 
+
 def get_sgd_noise(model, arch_type, curr_device, opt, full_loader):
     """
     :param model:
@@ -1257,6 +1258,7 @@ def main(cfg):
                             #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
                             if sgd_noise.sum().item()>0.:
                                 gn.append(get_tail_index(sgd_noise))
+                                print('*****************',sgd_noise.shape,get_tail_index(sgd_noise).shape)
                                 
                             
 
