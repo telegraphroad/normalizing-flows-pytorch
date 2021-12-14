@@ -1,3 +1,4 @@
+import gc
 import time
 import shutil
 import warnings
@@ -947,30 +948,9 @@ class Model(object):
         loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
-        with torch.no_grad():
+        if True:
             gc.collect()
-            self.net.eval()
             grads, sizes = [], []
-            opt.zero_grad()
-            z, log_det_jacobian = self.net(y)
-            z = z.view(y.size(0), -1)
-            #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
-            if self._loss == 'ML':
-                loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
-            elif self._loss == 'TA':
-                beta = -1
-                logp = self.base_distribution.log_prob(z)
-                #logp = self.base_distribution.log_prob(y)
-                logq = self.log_py(z)
-                #logq = self.log_py(y)
-                diff = logp - logq
-                weights = torch.exp(diff - diff.max())
-                prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
-                prob = torch.greater(prob, 0.5).float()
-                F = 1 - prob.sum(1) / self._batch_size
-                gammas = F ** beta
-                gammas /= gammas.sum()
-                loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
             loss.backward()
             grad = [param.grad.cpu().clone() for param in self.net.parameters()]
             size = self._batch_size
