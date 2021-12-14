@@ -1321,7 +1321,7 @@ def main(cfg):
 
                             
 
-                            for param in model.net.parameters():
+                            for param in list(model.net.parameters()):
                                 print(param)
                             
                             grad = [param.grad.cpu().clone() for param in model.net.parameters()]
