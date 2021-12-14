@@ -1,12 +1,12 @@
-python main41.py
-python main42.py
-python main43.py
-python main44.py
-python main45.py
-python main46.py
-python main47.py
-python main48.py
-python main49.py
-python main50.py
+python main69.py
+python main68.py
+python main67.py
+python main66.py
+python main65.py
+python main64.py
+python main63.py
+python main62.py
+python main61.py
+python main60.py
 
 
