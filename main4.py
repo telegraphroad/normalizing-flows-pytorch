@@ -1184,7 +1184,7 @@ def main(cfg):
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
                 for vnbeta in [2.]:#2.]:
-                    for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
+                    for vdbeta in [0.4,1.2, 2., 2.8,3.6]:
                         gn = []
                         gc.collect()
                         grads, sizes = [], []
@@ -1307,7 +1307,7 @@ def main(cfg):
 
         for vprior in ['ggd','mvn']:#,'mvggd']:
             for vvariable in [False]:
-                for vnbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
+                for vnbeta in [0.4,1.2, 2., 2.8,3.6]:
                     for vdbeta in [0.4,1.2, 2., 2.8,3.6]:
                     # dataset
                         gn = []
