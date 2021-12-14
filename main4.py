@@ -87,111 +87,28 @@ def get_sgd_noise(model, arch_type, curr_device, opt, full_loader):
     # Grad_noise = Flat_Grads-Exact_Grad
     return full_grads, sgd_noise
 
-@utils.with_no_grad
-def get_sgd_covariance_diagonal(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
-    """ Returns the diagonal of the per-sample SGD noise covariance matrix.
-    The formula is \Sigma = \frac{1}{n} \sum_{i=1}^n g_i g_i^T - \bar{g} \bar{g}^T, where g_i is the gradient
-    corresponding to the ith example and \bar{g} is the total gradient. Note that we can ignore weight decay here,
-    as adding weight decay doesn't change the SGD noise covariance matrix.
+def get_tail_index(sgd_noise):
     """
-    np.random.seed(seed)
-    model.eval()
-
-    if num_workers > 0:
-        torch.multiprocessing.set_sharing_strategy('file_system')
-        torch.multiprocessing.set_start_method('spawn', force=True)
-
-    n_examples = min(len(dataset), max_num_examples)
-    loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
-                        batch_size=1, shuffle=False, num_workers=num_workers)
-
-    grad_sum = defaultdict(lambda: None)
-    grad_squared_sum = defaultdict(lambda: None)
-
-    # loop over the dataset
-    for inputs_batch, labels_batch in tqdm(loader, desc='Computing sgd noise covariance...'):
-        if isinstance(inputs_batch, torch.Tensor):
-            inputs_batch = [inputs_batch]
-        if not isinstance(labels_batch, list):
-            labels_batch = [labels_batch]
-
-        with torch.set_grad_enabled(True):
-            outputs = model.forward(inputs=inputs_batch, labels=labels_batch, loader=loader, **kwargs)
-            batch_losses, outputs = model.compute_loss(inputs=inputs_batch, labels=labels_batch, outputs=outputs,
-                                                       loader=loader, dataset=loader.dataset)
-            batch_total_loss = sum([loss for name, loss in batch_losses.items()])
-
-        grad = torch.autograd.grad(batch_total_loss, model.parameters())
-        if cpu:
-            grad = [utils.to_cpu(v) for v in grad]
-
-        for (k, _), v in zip(model.named_parameters(), grad):
-            if grad_sum[k] is None:
-                grad_sum[k] = v
-            else:
-                grad_sum[k] += v
-
-            if grad_squared_sum[k] is None:
-                grad_squared_sum[k] = v**2
-            else:
-                grad_squared_sum[k] += v**2
-
-    out = dict()
-    for k in grad_sum.keys():
-        out[k] = grad_squared_sum[k] / n_examples - (grad_sum[k] / n_examples) ** 2
-
-    return out
-
-
-@utils.with_no_grad
-def get_sgd_covariance_full(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
-    """ Returns the per-sample SGD noise covariance matrix. Works when number of parameters is not large.
-    The formula is \Sigma = \frac{1}{n} \sum_{i=1}^n g_i g_i^T - \bar{g} \bar{g}^T, where g_i is the gradient
-    corresponding to the ith example and \bar{g} is the total gradient. Note that we can ignore weight decay here,
-    as adding weight decay doesn't change the SGD noise covariance matrix.
+    Returns an estimate of the tail-index term of the alpha-stable distribution for the stochastic gradient noise.
+    In the paper, the tail-index is denoted by $\alpha$. Simsekli et. al. use the estimator posed by Mohammadi et al. in
+    2015.
+    :param sgd_noise:
+    :return: tail-index term ($\alpha$) for an alpha-stable distribution
     """
-    np.random.seed(seed)
-    model.eval()
-
-    if num_workers > 0:
-        torch.multiprocessing.set_sharing_strategy('file_system')
-        torch.multiprocessing.set_start_method('spawn', force=True)
-
-    n_examples = min(len(dataset), max_num_examples)
-    loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
-                        batch_size=1, shuffle=False, num_workers=num_workers)
-
-    n_params = utils.get_num_parameters(model)
-    avg_grad = torch.zeros((n_params,), dtype=torch.float, device=('cpu' if cpu else model.device))
-    sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=('cpu' if cpu else model.device))
-
-    # loop over the dataset
-    for inputs_batch, labels_batch in tqdm(loader, desc='Computing sgd noise covariance...'):
-        if isinstance(inputs_batch, torch.Tensor):
-            inputs_batch = [inputs_batch]
-        if not isinstance(labels_batch, list):
-            labels_batch = [labels_batch]
-
-        with torch.set_grad_enabled(True):
-            outputs = model.forward(inputs=inputs_batch, labels=labels_batch, loader=loader, **kwargs)
-            batch_losses, outputs = model.compute_loss(inputs=inputs_batch, labels=labels_batch, outputs=outputs,
-                                                       loader=loader, dataset=loader.dataset)
-            batch_total_loss = sum([loss for name, loss in batch_losses.items()])
-
-        grad = torch.autograd.grad(batch_total_loss, model.parameters())
-        if cpu:
-            grad = [utils.to_cpu(v) for v in grad]
-
-        grad_flat = [v.flatten() for v in grad]
-        grad_flat = torch.cat(grad_flat, dim=0)
-
-        avg_grad += 1.0 / n_examples * grad_flat
-        sigma += 1.0 / n_examples * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
-
-    sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
-
-    return sigma
-
+    X = sgd_noise.reshape(-1)
+    X = X[X.nonzero()]
+    K = len(X)
+    if len(X.shape)>1:
+        X = X.squeeze()
+    K1 = int(np.floor(np.sqrt(K)))
+    K2 = K1
+    X = X[:K1*K2].reshape((K2, K1))
+    Y = X.sum(1)
+    # X = X.cpu().clone(); Y = Y.cpu().clone()
+    a = torch.log(torch.abs(Y)).mean()
+    b = (torch.log(torch.abs(X[:K2/4,:])).mean()+torch.log(torch.abs(X[K2/4:K2/2,:])).mean()+torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean()+torch.log(torch.abs(X[3*K2/4:,:])).mean())/4
+    alpha_hat = np.log(K1)/(a-b).item()
+    return alpha_hat
 
 class GenNormal(ExponentialFamily):
     r"""
@@ -1337,7 +1254,8 @@ def main(cfg):
                             flat_grads = torch.stack(flat_grads)
                             sgd_noise = (flat_grads-full_grads).cpu()
                             # Grad_noise = Flat_Grads-Exact_Grad
-                            print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)    
+                            #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                            print(get_tail_index(sgd_noise))
                             
 
 
