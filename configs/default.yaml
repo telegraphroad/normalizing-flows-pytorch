@@ -7,7 +7,7 @@ network:
   layers: 32
 
 train:
-  steps: 20
+  steps: 2
   samples: 1024
 
 optimizer:
