@@ -1264,7 +1264,8 @@ def main(cfg):
                             sgd_noise = (flat_grads-full_grads).cpu()
                             # Grad_noise = Flat_Grads-Exact_Grad
                             print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                            print(get_tail_index(sgd_noise.squeeze()))
+                            if sgd_noise.sum().item()>0.:
+                                print(get_tail_index(sgd_noise.squeeze()))
                             
 
 
