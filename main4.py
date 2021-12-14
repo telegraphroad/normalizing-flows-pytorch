@@ -103,7 +103,9 @@ def get_tail_index(sgd_noise):
     K1 = int(np.floor(np.sqrt(K)))
     K2 = K1
     X = X[:K1*K2].reshape((K2, K1))
+    print('X',X)
     Y = X.sum(1)
+    print('Y',Y)
     # X = X.cpu().clone(); Y = Y.cpu().clone()
     a = torch.log(torch.abs(Y)).mean()
     print('1',a)
