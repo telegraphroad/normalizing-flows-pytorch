@@ -1258,7 +1258,7 @@ def main(cfg):
                             #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
                             if sgd_noise.sum().item()>0.:
                                 gn.append(get_tail_index(sgd_noise))
-                                print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+                                #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
                                 
                             
 
@@ -1298,7 +1298,7 @@ def main(cfg):
                         #print('QX',qx)
                         #print(model.sample_y(20000).cpu().detach())
                         y,_ = model.sample_y(20000)
-                        print(get_tail_index(x),get_tail_index(y))
+                        print('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',get_tail_index(x),get_tail_index(y))
                         klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
                         #print(klds)
                         pd.DataFrame(klds).to_csv('./kld.csv')
