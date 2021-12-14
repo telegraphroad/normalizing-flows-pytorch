@@ -113,12 +113,12 @@ def get_tail_index(sgd_noise):
     print('k1k2',K1,K2)
     print('1',a)
     print(type(X),X.shape,K2/4)
-    print(X[:K2/4,:])
-    print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
-    print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
-    print('4',torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean())
-    print('5',torch.log(torch.abs(X[3*K2/4:,:])).mean())
-    b = (torch.log(torch.abs(X[:K2/4,:])).mean()+torch.log(torch.abs(X[K2/4:K2/2,:])).mean()+torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean()+torch.log(torch.abs(X[3*K2/4:,:])).mean())/4
+    #print(X[:int(K2/4),:])
+    #print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
+    #print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
+    #print('4',torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean())
+    #print('5',torch.log(torch.abs(X[3*K2/4:,:])).mean())
+    b = (torch.log(torch.abs(X[:int(K2/4),:])).mean()+torch.log(torch.abs(X[int(K2/4):int(K2/2),:])).mean()+torch.log(torch.abs(X[int(K2/2):3*int(K2/4),:])).mean()+torch.log(torch.abs(X[3*int(K2/4):,:])).mean())/4
     alpha_hat = np.log(K1)/(a-b).item()
     return alpha_hat
 
