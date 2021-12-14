@@ -1321,8 +1321,6 @@ def main(cfg):
 
                             print('------------------------------------------------------------------')                            
                             
-                            for param in model.net.parameters():
-                                print(param.grad)
                             grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
                             size = 1024
                             grads.append(grad)
