@@ -1290,14 +1290,15 @@ def main(cfg):
                                 ckpt_file = prefix + 'latest.pth'
                                 model.save_ckpt(step, ckpt_file)
                         x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
-                        y = torch.FloatTensor(model.sample_y(20000)).to(device).T
-                        print(get_tail_index(x),get_tail_index(y))
+                        
+                        
                         px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
                         qx = model.log_py(x)
                         #print('PX',px)
                         #print('QX',qx)
                         #print(model.sample_y(20000).cpu().detach())
                         y,_ = model.sample_y(20000)
+                        print(get_tail_index(x),get_tail_index(y))
                         klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
                         #print(klds)
                         pd.DataFrame(klds).to_csv('./kld.csv')
