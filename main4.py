@@ -95,9 +95,7 @@ def get_tail_index(sgd_noise):
     :param sgd_noise:
     :return: tail-index term ($\alpha$) for an alpha-stable distribution
     """
-    X = sgd_noise.squeeze(0).reshape(-1)
-    #print(X.shape)
-    #print('X',X)
+    X = sgd_noise.reshape(-1)
     X = X[X.nonzero()]
     K = len(X)
     if len(X.shape)>1:
@@ -105,19 +103,9 @@ def get_tail_index(sgd_noise):
     K1 = int(np.floor(np.sqrt(K)))
     K2 = int(K1)
     X = X[:K1*K2].reshape((K2, K1))
-    #print('X',X)
     Y = X.sum(1)
-    #print('Y',Y)
     # X = X.cpu().clone(); Y = Y.cpu().clone()
     a = torch.log(torch.abs(Y)).mean()
-    print('k1k2',K1,K2)
-    print('1',a)
-    print(type(X),X.shape,K2/4)
-    #print(X[:int(K2/4),:])
-    #print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
-    #print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
-    #print('4',torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean())
-    #print('5',torch.log(torch.abs(X[3*K2/4:,:])).mean())
     b = (torch.log(torch.abs(X[:int(K2/4),:])).mean()+torch.log(torch.abs(X[int(K2/4):int(K2/2),:])).mean()+torch.log(torch.abs(X[int(K2/2):3*int(K2/4),:])).mean()+torch.log(torch.abs(X[3*int(K2/4):,:])).mean())/4
     alpha_hat = np.log(K1)/(a-b).item()
     return alpha_hat
