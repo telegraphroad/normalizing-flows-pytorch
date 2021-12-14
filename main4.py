@@ -1257,7 +1257,7 @@ def main(cfg):
                             #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
                             if sgd_noise.sum().item()>0.:
                                 gn.append(get_tail_index(sgd_noise))
-                                print('********',gn)
+                                
                             
 
 
@@ -1288,6 +1288,7 @@ def main(cfg):
                                 ckpt_file = prefix + 'latest.pth'
                                 model.save_ckpt(step, ckpt_file)
                         x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
+                        print('HHHHHHHHHHHHHHHHHHH',get_tail_index(x)
                         px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
                         qx = model.log_py(x)
                         print('PX',px)
