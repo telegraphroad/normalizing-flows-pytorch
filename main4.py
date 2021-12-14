@@ -95,7 +95,7 @@ def get_tail_index(sgd_noise):
     :param sgd_noise:
     :return: tail-index term ($\alpha$) for an alpha-stable distribution
     """
-    X = sgd_noise.reshape(-1)
+    X = sgd_noise.squeeze(0).reshape(-1)
     X = X[X.nonzero()]
     K = len(X)
     if len(X.shape)>1:
