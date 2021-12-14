@@ -1320,7 +1320,7 @@ def main(cfg):
                             z, loss = model.train_on_batch(y)
 
                             print('------------------------------------------------------------------')                            
-                            print(
+                            
                             for param in model.net.parameters():
                                 print(param.grad)
                             grad = [param.grad.cpu().clone() for param in list(model.net.parameters())]
