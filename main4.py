@@ -112,6 +112,7 @@ def get_tail_index(sgd_noise):
     a = torch.log(torch.abs(Y)).mean()
     #print('k1k2',K1,K2)
     print('1',a)
+    print(X.shape)
     print(X[:K2/4,:])
     print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
     print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
