@@ -948,47 +948,7 @@ class Model(object):
         loss.backward(retain_graph=True)
         self.optim.step()
         self.schduler.step()
-        if True:
-            gc.collect()
-            grads, sizes = [], []
-            loss.backward()
-            grad = [param.grad.cpu().clone() for param in self.net.parameters()]
-            size = self._batch_size
-            grads.append(grad)
-            sizes.append(size)
-            flat_grads = []
-            for grad in grads:
-                flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-            full_grads = torch.zeros(flat_grads[-1].shape)
-            # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-            for g, s in zip(flat_grads, sizes):
-                full_grads += g * s
-            full_grads /= np.sum(sizes)
-            gc.collect()
-            flat_grads = torch.stack(flat_grads)
-            sgd_noise = (flat_grads-full_grads).cpu()
-            # Grad_noise = Flat_Grads-Exact_Grad
-            print('------------------------------------------FG,SGN',full_grads, sgd_noise)    
-            self.net.train()
 
-                    
-            
-#            grad_sum = defaultdict(lambda: None)
-#            grad_squared_sum = defaultdict(lambda: None)
-            
-
-#             n_params = utils.get_num_parameters(self.net)
-#             avg_grad = torch.zeros((n_params,), dtype=torch.float, device=(self.device))
-#             sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=(self.device))
-#             grad = torch.autograd.grad(batch_total_loss, self.net.parameters())
-#             grad_flat = [v.flatten() for v in grad]
-#             grad_flat = torch.cat(grad_flat, dim=0)
-
-#             avg_grad += 1.0 / self._batch_size * grad_flat
-#             sigma += 1.0 / self._batch_size * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
-
-#             sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
-#             print('sigma#########################',sigma)
         return z, loss
 
     def save_ckpt(self, step, filename):
@@ -1307,7 +1267,10 @@ def main(cfg):
             for vvariable in [True]:
                 for vnbeta in []:#2.]:
                     for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
-                    # dataset
+                        
+                        gc.collect()
+                        grads, sizes = [], []
+                        # dataset
                         if ddistrib != 'ggd':
                             dataset = FlowDataLoader(ddistrib,
                                                      batch_size=cfg.train.samples,
@@ -1355,6 +1318,32 @@ def main(cfg):
                             start_time = time.perf_counter()
                             y = data
                             z, loss = model.train_on_batch(y)
+
+                            
+                            
+                            grad = [param.grad.cpu().clone() for param in model.net.parameters()]
+                            size = 1024
+                            grads.append(grad)
+                            sizes.append(size)
+                            flat_grads = []
+                            for grad in grads:
+                                flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                            full_grads = torch.zeros(flat_grads[-1].shape)
+                            # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                            for g, s in zip(flat_grads, sizes):
+                                full_grads += g * s
+                            full_grads /= np.sum(sizes)
+                            gc.collect()
+                            flat_grads = torch.stack(flat_grads)
+                            sgd_noise = (flat_grads-full_grads).cpu()
+                            # Grad_noise = Flat_Grads-Exact_Grad
+                            print('------------------------------------------FG,SGN',full_grads, sgd_noise)    
+                            
+
+
+
+                            
+                            
                             elapsed_time = time.perf_counter() - start_time
                             prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
                             # update for the next step
