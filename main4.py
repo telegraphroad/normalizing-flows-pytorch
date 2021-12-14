@@ -1236,8 +1236,8 @@ def main(cfg):
                             y = data
                             z, loss = model.train_on_batch(y)
 
-                            print('------------------------------------------------------------------')                            
-                            grads, sizes = [], []
+                            #print('------------------------------------------------------------------')                            
+                            #grads, sizes = [], []
                             grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
                             size = 1024
                             grads.append(grad)
@@ -1256,7 +1256,7 @@ def main(cfg):
                             # Grad_noise = Flat_Grads-Exact_Grad
                             #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
                             if sgd_noise.sum().item()>0.:
-                                gn.append(get_tail_index(sgd_noise.squeeze()))
+                                gn.append(get_tail_index(sgd_noise))
                                 print('********',gn)
                             
 
