@@ -1265,7 +1265,7 @@ def main(cfg):
     for loss_type in ['ML','TA']:
         for vprior in ['ggd','mvn','ggd']:
             for vvariable in [True]:
-                for vnbeta in []:#2.]:
+                for vnbeta in [2.]:#2.]:
                     for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
                         
                         gc.collect()
