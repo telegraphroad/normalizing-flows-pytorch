@@ -1290,7 +1290,7 @@ def main(cfg):
                                 ckpt_file = prefix + 'latest.pth'
                                 model.save_ckpt(step, ckpt_file)
                         x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
-                        y = model.sample_y(20000).T
+                        y = torch.FloatTensor(model.sample_y(20000)).to(device).T
                         print(get_tail_index(x),get_tail_index(y))
                         px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
                         qx = model.log_py(x)
