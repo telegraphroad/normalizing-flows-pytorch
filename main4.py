@@ -45,6 +45,46 @@ import numpy as np
 
 from nnlib.nnlib import utils
 
+def get_sgd_noise(model, arch_type, curr_device, opt, full_loader):
+    """
+    :param model:
+    :param arch_type:
+    :param curr_device:
+    :param opt:
+    :param full_loader:
+    :return:
+    """
+    gc.collect()
+    # We do NOT want to be training on the full gradients, just calculating them!!!!
+    model.eval()
+    grads, sizes = [], []
+    for batch_idx, (inputs, labels) in enumerate(full_loader):
+        inputs, labels = inputs.to(curr_device), labels.to(curr_device)
+        opt.zero_grad()
+        if arch_type == 'mlp':
+            inputs = inputs.view(inputs.size(0), -1)
+        outputs = model(inputs)
+        loss = model.loss(outputs, labels)
+        loss.backward()
+        grad = [param.grad.cpu().clone() for param in model.parameters()]
+        # grad = [p.grad.clone() for p in model.parameters()]
+        size = inputs.shape[0]
+        grads.append(grad)
+        sizes.append(size)
+
+    flat_grads = []
+    for grad in grads:
+        flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+    full_grads = torch.zeros(flat_grads[-1].shape)
+    # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+    for g, s in zip(flat_grads, sizes):
+        full_grads += g * s
+    full_grads /= np.sum(sizes)
+    gc.collect()
+    flat_grads = torch.stack(flat_grads)
+    sgd_noise = (flat_grads-full_grads).cpu()
+    # Grad_noise = Flat_Grads-Exact_Grad
+    return full_grads, sgd_noise
 
 @utils.with_no_grad
 def get_sgd_covariance_diagonal(model, dataset, cpu=True, max_num_examples=2**30, num_workers=0, seed=42, **kwargs):
@@ -908,18 +948,67 @@ class Model(object):
         self.optim.step()
         self.schduler.step()
         with torch.no_grad():
-            n_params = utils.get_num_parameters(self.net)
-            avg_grad = torch.zeros((n_params,), dtype=torch.float, device=(self.device))
-            sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=(self.device))
-            grad = torch.autograd.grad(batch_total_loss, self.net.parameters())
-            grad_flat = [v.flatten() for v in grad]
-            grad_flat = torch.cat(grad_flat, dim=0)
+            gc.collect()
+            self.net.eval()
+            grads, sizes = [], []
+            opt.zero_grad()
+            z, log_det_jacobian = self.net(y)
+            z = z.view(y.size(0), -1)
+            #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
+            if self._loss == 'ML':
+                loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
+            elif self._loss == 'TA':
+                beta = -1
+                logp = self.base_distribution.log_prob(z)
+                #logp = self.base_distribution.log_prob(y)
+                logq = self.log_py(z)
+                #logq = self.log_py(y)
+                diff = logp - logq
+                weights = torch.exp(diff - diff.max())
+                prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
+                prob = torch.greater(prob, 0.5).float()
+                F = 1 - prob.sum(1) / self._batch_size
+                gammas = F ** beta
+                gammas /= gammas.sum()
+                loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
+            loss.backward()
+            grad = [param.grad.cpu().clone() for param in self.net.parameters()]
+            size = self._batch_size
+            grads.append(grad)
+            sizes.append(size)
+            flat_grads = []
+            for grad in grads:
+                flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+            full_grads = torch.zeros(flat_grads[-1].shape)
+            # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+            for g, s in zip(flat_grads, sizes):
+                full_grads += g * s
+            full_grads /= np.sum(sizes)
+            gc.collect()
+            flat_grads = torch.stack(flat_grads)
+            sgd_noise = (flat_grads-full_grads).cpu()
+            # Grad_noise = Flat_Grads-Exact_Grad
+            print('------------------------------------------FG,SGN',full_grads, sgd_noise)    
+            self.net.train()
 
-            avg_grad += 1.0 / self._batch_size * grad_flat
-            sigma += 1.0 / self._batch_size * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
+                    
+            
+#            grad_sum = defaultdict(lambda: None)
+#            grad_squared_sum = defaultdict(lambda: None)
+            
 
-            sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
-            print('sigma#########################',sigma)
+#             n_params = utils.get_num_parameters(self.net)
+#             avg_grad = torch.zeros((n_params,), dtype=torch.float, device=(self.device))
+#             sigma = torch.zeros((n_params, n_params), dtype=torch.float, device=(self.device))
+#             grad = torch.autograd.grad(batch_total_loss, self.net.parameters())
+#             grad_flat = [v.flatten() for v in grad]
+#             grad_flat = torch.cat(grad_flat, dim=0)
+
+#             avg_grad += 1.0 / self._batch_size * grad_flat
+#             sigma += 1.0 / self._batch_size * torch.mm(grad_flat.reshape((-1, 1)), grad_flat.reshape((1, -1)))
+
+#             sigma = sigma - torch.mm(avg_grad.reshape((-1, 1)), avg_grad.reshape((1, -1)))
+#             print('sigma#########################',sigma)
         return z, loss
 
     def save_ckpt(self, step, filename):
