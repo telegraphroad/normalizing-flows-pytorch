@@ -96,8 +96,8 @@ def get_tail_index(sgd_noise):
     :return: tail-index term ($\alpha$) for an alpha-stable distribution
     """
     X = sgd_noise.squeeze(0).reshape(-1)
-    print(X.shape)
-    print('X',X)
+    #print(X.shape)
+    #print('X',X)
     X = X[X.nonzero()]
     K = len(X)
     if len(X.shape)>1:
@@ -105,13 +105,14 @@ def get_tail_index(sgd_noise):
     K1 = int(np.floor(np.sqrt(K)))
     K2 = K1
     X = X[:K1*K2].reshape((K2, K1))
-    print('X',X)
+    #print('X',X)
     Y = X.sum(1)
-    print('Y',Y)
+    #print('Y',Y)
     # X = X.cpu().clone(); Y = Y.cpu().clone()
     a = torch.log(torch.abs(Y)).mean()
-    print('k1k2',K1,K2)
+    #print('k1k2',K1,K2)
     print('1',a)
+    print(X[:K2/4,:])
     print('2',torch.log(torch.abs(X[:K2/4,:])).mean())
     print('3',torch.log(torch.abs(X[K2/4:K2/2,:])).mean())
     print('4',torch.log(torch.abs(X[K2/2:3*K2/4,:])).mean())
