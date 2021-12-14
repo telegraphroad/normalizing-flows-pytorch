@@ -103,7 +103,7 @@ def get_tail_index(sgd_noise):
     if len(X.shape)>1:
         X = X.squeeze()
     K1 = int(np.floor(np.sqrt(K)))
-    K2 = K1
+    K2 = int(K1)
     X = X[:K1*K2].reshape((K2, K1))
     #print('X',X)
     Y = X.sum(1)
