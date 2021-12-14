@@ -1184,7 +1184,7 @@ def main(cfg):
             for vvariable in [True]:
                 for vnbeta in [2.]:#2.]:
                     for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
-                        
+                        gn = []
                         gc.collect()
                         grads, sizes = [], []
                         # dataset
@@ -1237,7 +1237,7 @@ def main(cfg):
                             z, loss = model.train_on_batch(y)
 
                             print('------------------------------------------------------------------')                            
-                            
+                            grads, sizes = [], []
                             grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
                             size = 1024
                             grads.append(grad)
@@ -1256,7 +1256,8 @@ def main(cfg):
                             # Grad_noise = Flat_Grads-Exact_Grad
                             print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
                             if sgd_noise.sum().item()>0.:
-                                print(get_tail_index(sgd_noise.squeeze()))
+                                gn.append(get_tail_index(sgd_noise.squeeze()))
+                                print(gn)
                             
 
 
@@ -1293,7 +1294,7 @@ def main(cfg):
                         print('QX',qx)
                         #print(model.sample_y(20000).cpu().detach())
                         y,_ = model.sample_y(20000)
-                        klds.append([F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta])
+                        klds.append([F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta],gn)
                         print(klds)
                         pd.DataFrame(klds).to_csv('./kld.csv')
 
