@@ -1321,7 +1321,7 @@ def main(cfg):
 
                             print('------------------------------------------------------------------')                            
                             print(
-                            for for param in model.net.parameters():
+                            for param in model.net.parameters():
                                 print(param.grad)
                             grad = [param.grad.cpu().clone() for param in list(model.net.parameters())]
                             size = 1024
