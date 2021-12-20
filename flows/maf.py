@@ -9,6 +9,10 @@ from .modules import Compose, BatchNorm
 class MADE(nn.Module):
     def __init__(self, in_out_features, num_hidden=2, base_filters=32, use_companion=False):
         super(MADE, self).__init__()
+        self.dp1 = None
+        self.dp2 = None
+        self.dp3 = None
+        self.dp4 = None        
         self.in_out_chs = in_out_features
         self.num_hidden = num_hidden
         self.base_filters = base_filters
