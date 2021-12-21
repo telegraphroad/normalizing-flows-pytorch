@@ -829,7 +829,7 @@ class Model(object):
 
         self.schduler = torch.optim.lr_scheduler.StepLR(self.optim,
                                                         step_size=cfg.optimizer.decay_steps,
-                                                        gamma=cfg.optimizer.decay_ratio,verbose=True)
+                                                        gamma=cfg.optimizer.decay_ratio,verbose=False)
 
     def train(self):
         self.net.train()
@@ -848,18 +848,27 @@ class Model(object):
             loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
         elif self._loss == 'TA':
             beta = -1
-            logp = self.base_distribution.log_prob(z)
-            #logp = self.base_distribution.log_prob(y)
-            logq = self.log_py(z)
-            #logq = self.log_py(y)
+            #logp = self.base_distribution.log_prob(z)
+            #y,_ = self.sample_y(1000)
+            logp = self.log_pz(y)
+            #print('logp',logp.mean())
+            logp = logp + ((y-z)**2).mean()
+            #print('logp2',logp.mean())
+            #logq = self.log_py(z)
+            logq = self.log_py(y)
+            #print('logq',logq.mean())
             diff = logp - logq
+            #print('diff',diff.mean())
             weights = torch.exp(diff - diff.max())
             prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
             prob = torch.greater(prob, 0.5).float()
             F = 1 - prob.sum(1) / self._batch_size
+            #print('1',F.mean())
             gammas = F ** beta
+            #print('2',gammas.mean())
             gammas /= gammas.sum()
-            loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
+            #print('3',gammas.mean())
+            loss = torch.sum(torch.unsqueeze(gammas * diff, 1))
         
 
         self.optim.zero_grad()
@@ -872,6 +881,7 @@ class Model(object):
     def save_ckpt(self, step, filename):
         ckpt = {
             'net': self.net.state_dict(),
+            'base': self.base_distribution,
             'optim': self.optim.state_dict(),
             'step': step,
         }
@@ -881,6 +891,7 @@ class Model(object):
         ckpt = torch.load(filename)
         self.net.load_state_dict(ckpt['net'])
         self.optim.load_state_dict(ckpt['optim'])
+        self.base_distribution = ckpt['base']
         epoch = ckpt['step']
         return epoch
 
@@ -1180,251 +1191,250 @@ def main(cfg):
     print('*********************')
     print('')
     ddim = 2
-    for loss_type in ['ML','TA']:
-        for vprior in ['ggd','mvn','ggd']:
-            for vvariable in [True]:
-                for vnbeta in [2.]:#2.]:
-                    for vdbeta in []:#[3.6]:#,1.2, 2., 2.8,3.6]:
-                        gn = []
-                        gc.collect()
-                        grads, sizes = [], []
-                        # dataset
-                        if ddistrib != 'ggd':
-                            dataset = FlowDataLoader(ddistrib,
-                                                     batch_size=cfg.train.samples,
-                                                     total_steps=cfg.train.steps,
-                                                     shuffle=True)
-                        else:
-                            dataset = FlowDataLoader(ddistrib,
-                                                         batch_size=cfg.train.samples,
-                                                         total_steps=cfg.train.steps,
-                                                         shuffle=True, beta = vdbeta, dim = ddim)
+    #for loss_type in ['ML','TA']:
+    loss_type = cfg.run.loss_type
+    vprior = cfg.run.vprior
+    vvariable = bool(cfg.run.vvariable)
+    vnbeta = cfg.run.vnbeta
+    vdbeta = cfg.run.vdbeta
+    print(loss_type,vprior,vvariable,vnbeta,vdbeta)
+    if vvariable == True:
+        gn = []
+        gc.collect()
+        grads, sizes = [], []
+        # dataset
+        if ddistrib != 'ggd':
+            dataset = FlowDataLoader(ddistrib,
+                                     batch_size=cfg.train.samples,
+                                     total_steps=cfg.train.steps,
+                                     shuffle=True)
+        else:
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, beta = vdbeta, dim = ddim)
 
 
-                        # setup train/eval model
-                        if vprior == 'mvn':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
-                        elif vprior == 'ggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
-                        elif vprior == 'mvggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
+        # setup train/eval model
+        if vprior == 'mvn':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
+        elif vprior == 'ggd':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
+        elif vprior == 'mvggd':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
 
-                        # summary writer
-                        writer = SummaryWriter('./')
+        # summary writer
+        writer = SummaryWriter('./')
 
-                        # CuDNN backends
-                        if cfg.run.debug:
-                            torch.backends.cudnn.deterministic = True
-                            torch.backends.cudnn.benchmark = False
-                            torch.autograd.set_detect_anomaly(True)
-                            for submodule in model.net.modules():
-                                submodule.register_forward_hook(anomaly_hook)
+        # CuDNN backends
+        if cfg.run.debug:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.autograd.set_detect_anomaly(True)
+            for submodule in model.net.modules():
+                submodule.register_forward_hook(anomaly_hook)
 
-                        else:
-                            torch.backends.cudnn.benchmark = True
+        else:
+            torch.backends.cudnn.benchmark = True
 
-                        # resume from checkpoint
-                        start_step = 0
-                        if cfg.run.ckpt_path is not None:
-                            start_step = model.load_ckpt(cfg.run.ckpt_path)
+        # resume from checkpoint
+        start_step = 0
+        if cfg.run.ckpt_path is not None:
+            start_step = model.load_ckpt(cfg.run.ckpt_path)
 
-                        # training
-                        step = start_step
-                        for data in dataset:
-                            # training
-                            model.train()
-                            start_time = time.perf_counter()
-                            y = data
-                            z, loss = model.train_on_batch(y)
+        # training
+        step = start_step
+        for data in dataset:
+            # training
+            model.train()
+            start_time = time.perf_counter()
+            y = data
+            z, loss = model.train_on_batch(y)
 
-                            if step % (cfg.run.display * 10) == 0:
-                                #print('------------------------------------------------------------------')                            
-                                #grads, sizes = [], []
-                                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
-                                size = 1024
-                                grads.append(grad)
-                                sizes.append(size)
-                                flat_grads = []
-                                for grad in grads:
-                                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                                full_grads = torch.zeros(flat_grads[-1].shape)
-                                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                                for g, s in zip(flat_grads, sizes):
-                                    full_grads += g * s
-                                full_grads /= np.sum(sizes)
-                                gc.collect()
-                                flat_grads = torch.stack(flat_grads)
-                                sgd_noise = (flat_grads-full_grads).cpu()
-                                # Grad_noise = Flat_Grads-Exact_Grad
-                                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                                if sgd_noise.sum().item()>0.:
-                                    gn.append(get_tail_index(sgd_noise))
-                                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
-                                
-                            
-
-
-
-                            
-                            
-                            elapsed_time = time.perf_counter() - start_time
-                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
-                            # update for the next step
-                            step += 1
-
-                            # reports
-                            if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
-                                # logging
-                                logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
-                                            (step, cfg.train.steps, loss.item(), elapsed_time))
-
-                            if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
-                                writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
-                                save_files = step % (cfg.run.display * 1000) == 0
-                                model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix=prefix)
-                                writer.flush()
-                                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
-
-                            if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
-                                # save ckpt
-
-                                ckpt_file = prefix + 'latest.pth'
-                                model.save_ckpt(step, ckpt_file)
-                        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
-                        
-                        
-                        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
-                        qx = model.log_py(x)
-                        #print('PX',px)
-                        #print('QX',qx)
-                        #print(model.sample_y(20000).cpu().detach())
-                        y,_ = model.sample_y(20000)
-                        #print('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',get_tail_index(x),get_tail_index(y))
-                        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
-                        #print(klds)
-                        pd.DataFrame(klds).to_csv('./kld.csv')
+            if step % (cfg.run.display * 10) == 0:
+                #print('------------------------------------------------------------------')                            
+                #grads, sizes = [], []
+                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                size = 1024
+                grads.append(grad)
+                sizes.append(size)
+                flat_grads = []
+                for grad in grads:
+                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                full_grads = torch.zeros(flat_grads[-1].shape)
+                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                for g, s in zip(flat_grads, sizes):
+                    full_grads += g * s
+                full_grads /= np.sum(sizes)
+                gc.collect()
+                flat_grads = torch.stack(flat_grads)
+                sgd_noise = (flat_grads-full_grads).cpu()
+                # Grad_noise = Flat_Grads-Exact_Grad
+                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                if sgd_noise.sum().item()>0.:
+                    gn.append(get_tail_index(sgd_noise))
+                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+                
+            
 
 
 
-        for vprior in ['ggd','mvn']:#,'mvggd']:
-            for vvariable in [False]:
-                for vnbeta in [0.4,1.2, 2., 2.8,3.6]:
-                    for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
-                    # dataset
-                        gn = []
-                        gc.collect()
-                        grads, sizes = [], []
+            
+            
+            elapsed_time = time.perf_counter() - start_time
+            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
+            # update for the next step
+            step += 1
 
-                        if ddistrib != 'ggd':
-                            dataset = FlowDataLoader(ddistrib,
-                                                     batch_size=cfg.train.samples,
-                                                     total_steps=cfg.train.steps,
-                                                     shuffle=True)
-                        else:
-                            dataset = FlowDataLoader(ddistrib,
-                                                         batch_size=cfg.train.samples,
-                                                         total_steps=cfg.train.steps,
-                                                         shuffle=True, beta = vdbeta, dim = ddim)
+            # reports
+            if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
+                # logging
+                logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
+                            (step, cfg.train.steps, loss.item(), elapsed_time))
+
+            if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
+                writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
+                save_files = step % (cfg.run.display * 1000) == 0
+                model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix=prefix)
+                writer.flush()
+                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+
+            if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
+                # save ckpt
+
+                ckpt_file = prefix + 'latest.pth'
+                model.save_ckpt(step, ckpt_file)
+        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
+        
+        
+        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
+        qx = model.log_py(x)
+        #print('PX',px)
+        #print('QX',qx)
+        #print(model.sample_y(20000).cpu().detach())
+        y,_ = model.sample_y(20000)
+        #print('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',get_tail_index(x),get_tail_index(y))
+        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
+        #print(klds)
+        pd.DataFrame(klds).to_csv('./kld.csv')
 
 
-                        # setup train/eval model
-                        if vprior == 'mvn':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
-                        elif vprior == 'ggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
-                        elif vprior == 'mvggd':
-                            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
-                        print('ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_')
-                        # summary writer
-                        writer = SummaryWriter('./')
 
-                        # CuDNN backends
-                        if cfg.run.debug:
-                            torch.backends.cudnn.deterministic = True
-                            torch.backends.cudnn.benchmark = False
-                            torch.autograd.set_detect_anomaly(True)
-                            for submodule in model.net.modules():
-                                submodule.register_forward_hook(anomaly_hook)
+    for vvariable in [False]:
+        gn = []
+        gc.collect()
+        grads, sizes = [], []
 
-                        else:
-                            torch.backends.cudnn.benchmark = True
+        if ddistrib != 'ggd':
+            dataset = FlowDataLoader(ddistrib,
+                                     batch_size=cfg.train.samples,
+                                     total_steps=cfg.train.steps,
+                                     shuffle=True)
+        else:
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, beta = vdbeta, dim = ddim)
 
-                        # resume from checkpoint
-                        start_step = 0
-                        if cfg.run.ckpt_path is not None:
-                            start_step = model.load_ckpt(cfg.run.ckpt_path)
 
-                        # training
-                        step = start_step
-                        for data in dataset:
-                            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
-                            # training
-                            model.train()
-                            start_time = time.perf_counter()
-                            y = data
-                            z, loss = model.train_on_batch(y)
-                            
-                            
-                            
-                            if step % (cfg.run.display * 10) == 0:
-                                #print('------------------------------------------------------------------')                            
-                                #grads, sizes = [], []
-                                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
-                                size = 1024
-                                grads.append(grad)
-                                sizes.append(size)
-                                flat_grads = []
-                                for grad in grads:
-                                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                                full_grads = torch.zeros(flat_grads[-1].shape)
-                                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                                for g, s in zip(flat_grads, sizes):
-                                    full_grads += g * s
-                                full_grads /= np.sum(sizes)
-                                gc.collect()
-                                flat_grads = torch.stack(flat_grads)
-                                sgd_noise = (flat_grads-full_grads).cpu()
-                                # Grad_noise = Flat_Grads-Exact_Grad
-                                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                                if sgd_noise.sum().item()>0.:
-                                    gn.append(get_tail_index(sgd_noise))
-                                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
-                            
-                            
-                            
-                            elapsed_time = time.perf_counter() - start_time
+        # setup train/eval model
+        if vprior == 'mvn':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
+        elif vprior == 'ggd':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
+        elif vprior == 'mvggd':
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
+        print('ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_')
+        # summary writer
+        writer = SummaryWriter('./')
 
-                            # update for the next step
-                            step += 1
+        # CuDNN backends
+        if cfg.run.debug:
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.autograd.set_detect_anomaly(True)
+            for submodule in model.net.modules():
+                submodule.register_forward_hook(anomaly_hook)
 
-                            # reports
-                            if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
-                                # logging
-                                logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
-                                            (step, cfg.train.steps, loss.item(), elapsed_time))
+        else:
+            torch.backends.cudnn.benchmark = True
 
-                            if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
-                                writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
-                                save_files = step % (cfg.run.display * 1000) == 0
-                                model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix = prefix)
-                                writer.flush()
-                                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+        # resume from checkpoint
+        start_step = 0
+        if cfg.run.ckpt_path is not None:
+            start_step = model.load_ckpt(cfg.run.ckpt_path)
 
-                            if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
-                                # save ckpt
+        # training
+        step = start_step
+        for data in dataset:
+            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
+            # training
+            model.train()
+            start_time = time.perf_counter()
+            y = data
+            z, loss = model.train_on_batch(y)
+            
+            
+            
+            if step % (cfg.run.display * 10) == 0:
+                #print('------------------------------------------------------------------')                            
+                #grads, sizes = [], []
+                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                size = 1024
+                grads.append(grad)
+                sizes.append(size)
+                flat_grads = []
+                for grad in grads:
+                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                full_grads = torch.zeros(flat_grads[-1].shape)
+                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                for g, s in zip(flat_grads, sizes):
+                    full_grads += g * s
+                full_grads /= np.sum(sizes)
+                gc.collect()
+                flat_grads = torch.stack(flat_grads)
+                sgd_noise = (flat_grads-full_grads).cpu()
+                # Grad_noise = Flat_Grads-Exact_Grad
+                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                if sgd_noise.sum().item()>0.:
+                    gn.append(get_tail_index(sgd_noise))
+                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+            
+            
+            
+            elapsed_time = time.perf_counter() - start_time
 
-                                ckpt_file = prefix + 'latest.pth'
-                                model.save_ckpt(step, ckpt_file)
-                        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
-                        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
-                        qx = model.log_py(x)
-                        print('PX',px)
-                        print('QX',qx)
-                        #print(model.sample_y(20000).cpu().detach())
-                        y,_ = model.sample_y(20000)
-                        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
-                        print(klds)
-                        pd.DataFrame(klds).to_csv('./kld.csv')
+            # update for the next step
+            step += 1
+
+            # reports
+            if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
+                # logging
+                logger.info('[%d/%d] loss=%.5f [%.3f s/it]' %
+                            (step, cfg.train.steps, loss.item(), elapsed_time))
+
+            if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
+                writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
+                save_files = step % (cfg.run.display * 1000) == 0
+                model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix = prefix)
+                writer.flush()
+                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+
+            if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
+                # save ckpt
+
+                ckpt_file = prefix + 'latest.pth'
+                model.save_ckpt(step, ckpt_file)
+        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,2])).to(device)
+        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
+        qx = model.log_py(x)
+        print('PX',px)
+        print('QX',qx)
+        #print(model.sample_y(20000).cpu().detach())
+        y,_ = model.sample_y(20000)
+        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
+        print(klds)
+        pd.DataFrame(klds).to_csv('./kld.csv')
                         
 
 

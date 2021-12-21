@@ -1,0 +1,6 @@
+- +run.loss_type=TA
+- +run.vprior=mvn
+- +run.vvariable=False
+- +run.vnbeta=2.0
+- +run.vdbeta=0.4
+- +run.ddim=20

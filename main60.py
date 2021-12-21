@@ -829,7 +829,7 @@ class Model(object):
 
         self.schduler = torch.optim.lr_scheduler.StepLR(self.optim,
                                                         step_size=cfg.optimizer.decay_steps,
-                                                        gamma=cfg.optimizer.decay_ratio,verbose=True)
+                                                        gamma=cfg.optimizer.decay_ratio,verbose=False)
 
     def train(self):
         self.net.train()
@@ -848,18 +848,27 @@ class Model(object):
             loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
         elif self._loss == 'TA':
             beta = -1
-            logp = self.base_distribution.log_prob(z)
-            #logp = self.base_distribution.log_prob(y)
-            logq = self.log_py(z)
-            #logq = self.log_py(y)
+            #logp = self.base_distribution.log_prob(z)
+            #y,_ = self.sample_y(1000)
+            logp = self.log_pz(y)
+            #print('logp',logp.mean())
+            logp = logp + ((y-z)**2).mean()
+            #print('logp2',logp.mean())
+            #logq = self.log_py(z)
+            logq = self.log_py(y)
+            #print('logq',logq.mean())
             diff = logp - logq
+            #print('diff',diff.mean())
             weights = torch.exp(diff - diff.max())
             prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
             prob = torch.greater(prob, 0.5).float()
             F = 1 - prob.sum(1) / self._batch_size
+            #print('1',F.mean())
             gammas = F ** beta
+            #print('2',gammas.mean())
             gammas /= gammas.sum()
-            loss = -torch.sum(torch.unsqueeze(gammas * diff, 1))
+            #print('3',gammas.mean())
+            loss = torch.sum(torch.unsqueeze(gammas * diff, 1))
         
 
         self.optim.zero_grad()
@@ -872,6 +881,7 @@ class Model(object):
     def save_ckpt(self, step, filename):
         ckpt = {
             'net': self.net.state_dict(),
+            'base': self.base_distribution,
             'optim': self.optim.state_dict(),
             'step': step,
         }
@@ -881,6 +891,7 @@ class Model(object):
         ckpt = torch.load(filename)
         self.net.load_state_dict(ckpt['net'])
         self.optim.load_state_dict(ckpt['optim'])
+        self.base_distribution = ckpt['base']
         epoch = ckpt['step']
         return epoch
 
@@ -1169,9 +1180,15 @@ Theory, 2008.
   # on the first term of the right hand side.
   return -np.log(r/s).sum() * d / n + np.log(m / (n - 1.))
 
+
 @hydra.main(config_path='configs', config_name='default')
 def main(cfg):
     # show parameters
+    # outfile = open('cfg.cfg','wb')
+    # pickle.dump(cfg,outfile)
+    # outfile.close()
+
+
     klds = []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ddistrib = 'ggd'
@@ -1180,8 +1197,9 @@ def main(cfg):
     print('*********************')
     print('')
     ddim = 2
-    for loss_type in ['ML','TA']:
-        for vprior in ['ggd','mvn','ggd']:
+    #for loss_type in ['ML','TA']:
+    for loss_type in ['TA','ML']:
+        for vprior in ['mvn','ggd']:
             for vvariable in [True]:
                 for vnbeta in [2.]:#2.]:
                     for vdbeta in [0.4]:#,1.2, 2., 2.8,3.6]:
@@ -1303,6 +1321,7 @@ def main(cfg):
                         klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
                         #print(klds)
                         pd.DataFrame(klds).to_csv('./kld.csv')
+
 
 
 

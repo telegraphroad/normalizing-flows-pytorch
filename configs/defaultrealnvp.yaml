@@ -3,7 +3,7 @@ hydra:
     dir: logs/${network.name}_${run.distrib}_${now:%Y-%m-%d_%H-%M-%S}
 
 network:
-  name: glow
+  name: realnvp
   layers: 16
 
 train:
@@ -28,4 +28,4 @@ run:
   display: 1
 
 defaults:
-  - network: glow
+  - network: realnvp

@@ -1,31 +1,27 @@
-hydra:
-  run:
-    dir: logs/${network.name}_${run.distrib}_${now:%Y-%m-%d_%H-%M-%S}
-
 network:
   name: glow
   layers: 16
-
 train:
   steps: 1800
   samples: 1024
-
 optimizer:
   name: adam
-  lr: 4.0e-4
+  lr: 0.0004
   beta1: 0.9
   beta2: 0.999
   weight_decay: 0.0
   decay_steps: 300
   decay_ratio: 0.5
-
 run:
   gpu: 0
-  debug: False
+  debug: false
   distrib: ggd
   ckpt_path: null
   output: outputs
   display: 1
-
-defaults:
-  - network: glow
+  loss_type: TA
+  vprior: mvn
+  vvariable: false
+  vnbeta: 2.0
+  vdbeta: 0.4
+  ddim: 20
