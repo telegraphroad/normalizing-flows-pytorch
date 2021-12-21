@@ -233,6 +233,7 @@ class ActNorm(nn.Module):
         self.register_parameter('log_scale', nn.Parameter(torch.zeros(self.dimensions)))
         self.register_parameter('bias', nn.Parameter(torch.zeros(self.dimensions)))
         self.initialized = False
+        print('+++++++++++++++++++++++++++++++++self_dim',self.dimensions)
 
     def forward(self, z, log_df_dz):
         if not self.initialized:
@@ -242,7 +243,8 @@ class ActNorm(nn.Module):
             self.log_scale.data.copy_(log_std.view(self.dimensions))
             self.bias.data.copy_(mean.view(self.dimensions))
             self.initialized = True
-
+        print('zshape',z.shape)
+        print('bias',self.bias.shape)
         z = (z - self.bias) / torch.exp(self.log_scale)
 
         num_pixels = np.prod(z.size()) // (z.size(0) * z.size(1))
