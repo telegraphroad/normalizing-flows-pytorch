@@ -245,6 +245,7 @@ class ActNorm(nn.Module):
             self.initialized = True
         
         
+        print('modules248',z.shape,self.bias.shape,self.log_scale.shape)
         z = (z - self.bias) / torch.exp(self.log_scale)
 
         num_pixels = np.prod(z.size()) // (z.size(0) * z.size(1))
