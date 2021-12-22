@@ -62,6 +62,7 @@ def checker_merge(z0, z1, odd=False):
 
 
 def squeeze1d(z, odd=False):
+    print('squeeze65,z',z.size(),z.dim())
     assert z.dim() == 2
     B, C = z.size()
     z = z.view(B, C // 2, 2)
