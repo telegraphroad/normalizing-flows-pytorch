@@ -31,7 +31,7 @@ class AbstractCoupling(nn.Module):
                             (masking, str(dims)))
 
     def forward(self, z, log_df_dz):
-        print('coupling33,z',z.shape)
+        #print('coupling33,z',z.shape)
         z0, z1 = self.squeeze(z)
         z0, z1, log_df_dz = self._transform(z0, z1, log_df_dz)
         z = self.unsqueeze(z0, z1)
