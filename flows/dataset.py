@@ -99,6 +99,7 @@ class FlowDataLoader(object):
             X_train_num_trans = pd.DataFrame(data=X_train_num_trans)
             amnt_num_trans_cols = X_train_num_trans.shape[1]
             X_train_final = X_train_num_trans
+            self.dsetdf = X_train_final
             self.dset = X_train_final.values
             self.dims = (30, )
             self.dtype = '2d'
@@ -175,6 +176,8 @@ class FlowDataLoader(object):
     def sample(self, n):
         if self.name == 'circles':
             return _sample_circles(n)
+        if self.name == 'credit':
+            return self.dsetdf.sample(n)
         elif self.name == 'ggd':
             return _sample_ggd(n,self._args['beta'],self._args['dim'])
         elif self.name == 't':
