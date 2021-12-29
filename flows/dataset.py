@@ -7,6 +7,9 @@ import torchvision
 import sklearn.datasets
 from torchvision import transforms
 from scipy.stats import gennorm,lognorm,t
+import pandas as pd
+from sklearn.utils import shuffle
+from sklearn.preprocessing import MinMaxScaler
 N_DATASET_SIZE = 65536
 
 
@@ -81,6 +84,24 @@ class FlowDataLoader(object):
                                                    transform=transforms.Pad((2, 2)))
             self.dims = (1, 32, 32)
             self.dtype = 'image'
+        elif self.name == 'credit':
+            ds = pd.read_csv('creditcard.csv')
+            ds = shuffle(ds)
+            num_cols = ds.columns[:-1]
+            target_col = 'Class'
+            X = ds.loc[:, num_cols]
+            y = ds.loc[:, target_col]
+            X_train_num = ds[num_cols]
+            minmax = MinMaxScaler()
+            X_train_num_trans = minmax.fit_transform(X_train_num)
+            #X_train_num_trans = X_train_num
+            X_train_num_trans = pd.DataFrame(data=X_train_num_trans)
+            amnt_num_trans_cols = X_train_num_trans.shape[1]
+            X_train_final = X_train_num_trans
+            self.dset = X_train_final.values
+            self.dims = (3, )
+            self.dtype = '2d'
+         
         elif self.name == 'cifar10':
             self.dset = torchvision.datasets.CIFAR10(root=os.path.join(data_root, 'cifar10'),
                                                      train=True,
