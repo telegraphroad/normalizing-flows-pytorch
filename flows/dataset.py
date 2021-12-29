@@ -100,7 +100,7 @@ class FlowDataLoader(object):
             amnt_num_trans_cols = X_train_num_trans.shape[1]
             X_train_final = X_train_num_trans
             self.dset = X_train_final.values
-            self.dims = (3, )
+            self.dims = (30, )
             self.dtype = '2d'
          
         elif self.name == 'cifar10':
