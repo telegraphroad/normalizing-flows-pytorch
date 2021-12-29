@@ -86,6 +86,7 @@ class FlowDataLoader(object):
             self.dtype = 'image'
         elif self.name == 'credit':
             ds = pd.read_csv('creditcard.csv')
+            print('CREDIT INITIALIZED!')
             ds = shuffle(ds)
             num_cols = ds.columns[:-1]
             target_col = 'Class'
