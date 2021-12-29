@@ -85,7 +85,7 @@ class FlowDataLoader(object):
             self.dims = (1, 32, 32)
             self.dtype = 'image'
         elif self.name == 'credit':
-            ds = pd.read_csv('creditcard.csv')
+            ds = pd.read_csv('/home/samiri/PhD/Synth/normalizing-flows-pytorch/creditcard.csv')
             print('CREDIT INITIALIZED!')
             ds = shuffle(ds)
             num_cols = ds.columns[:-1]
