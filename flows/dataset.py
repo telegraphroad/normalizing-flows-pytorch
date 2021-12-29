@@ -6,7 +6,7 @@ import torch
 import torchvision
 import sklearn.datasets
 from torchvision import transforms
-from scipy.stats import gennorm
+from scipy.stats import gennorm,lognorm,t
 N_DATASET_SIZE = 65536
 
 
@@ -21,7 +21,13 @@ def _sample_moons(n):
     return samples
 
 def _sample_ggd(n, beta, dim):
-    return gennorm(beta=beta).rvs(size=[n,dim])
+    return lognorm(beta=beta).rvs(size=[n,dim])
+
+def _sample_lognorm(n, s, dim):
+    return gennorm(s=s).rvs(size=[n,dim])
+
+def _sample_t(n, df, dim):
+    return t(df=df).rvs(size=[n,dim])
 
 def _sample_normals(n):
     radius = 0.7
@@ -85,8 +91,18 @@ class FlowDataLoader(object):
             self.dset = _sample_circles(N_DATASET_SIZE)
             self.dims = (2, )
             self.dtype = '2d'
+          
         elif self.name == 'ggd':
             self.dset = _sample_ggd(N_DATASET_SIZE,self._args['beta'],self._args['dim'])
+            self.dims = (self._args['dim'], )
+            self.dtype = str(self._args['dim']) + 'd'
+        elif self.name == 't':
+            self.dset = _sample_t(N_DATASET_SIZE,self._args['df'],self._args['dim'])
+            self.dims = (self._args['dim'], )
+            self.dtype = str(self._args['dim']) + 'd'
+          
+        elif self.name == 'lognorm':
+            self.dset = _sample_lognorm(N_DATASET_SIZE,self._args['s'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
 
@@ -139,6 +155,10 @@ class FlowDataLoader(object):
             return _sample_circles(n)
         elif self.name == 'ggd':
             return _sample_ggd(n,self._args['beta'],self._args['dim'])
+        elif self.name == 't':
+            return _sample_ggd(n,self._args['df'],self._args['dim'])
+        elif self.name == 'lognorm':
+            return _sample_lognorm(n,self._args['s'],self._args['dim'])
 
         elif self.name == 'moons':
             return _sample_moons(n)
