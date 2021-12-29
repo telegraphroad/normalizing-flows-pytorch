@@ -177,7 +177,7 @@ class FlowDataLoader(object):
         if self.name == 'circles':
             return _sample_circles(n)
         if self.name == 'credit':
-            return self.dsetdf.sample(n)
+            return self.dsetdf.sample(n).values
         elif self.name == 'ggd':
             return _sample_ggd(n,self._args['beta'],self._args['dim'])
         elif self.name == 't':
