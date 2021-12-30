@@ -119,15 +119,18 @@ class FlowDataLoader(object):
             self.dset = _sample_ggd(N_DATASET_SIZE,self._args['beta'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
+            self.bdist = gennorm(beta=self._args['beta'])
         elif self.name == 't':
             self.dset = _sample_t(N_DATASET_SIZE,self._args['df'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
+            self.bdist = t(df=self._args['df'])
           
         elif self.name == 'lognorm':
             self.dset = _sample_lognorm(N_DATASET_SIZE,self._args['s'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
+            self.bdist = lognorm(s=self._args['s'])
 
         elif self.name == 'moons':
             self.dset = _sample_moons(N_DATASET_SIZE)
