@@ -13,6 +13,9 @@ from torch import nn
 import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 
+import torch.distributions as tdistr
+
+from numpy import prod
 from flows import MAF, Glow, Ffjord, Flowpp, RealNVP, ResFlow, PlanarFlow
 from flows.misc import anomaly_hook
 from common.utils import image_plot, save_image, scatter_plot
@@ -45,6 +48,20 @@ import torch
 import numpy as np
 
 from nnlib.nnlib import utils
+
+from typing import List, Tuple
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import (
+    Distribution, Independent, MixtureSameFamily, MultivariateNormal, Normal
+)
+from torch.distributions.categorical import Categorical
+
+
+
+
 
 
 def get_sgd_noise(model, arch_type, curr_device, opt, full_loader):
@@ -165,7 +182,7 @@ class GenNormal(ExponentialFamily):
     def rsample(self, sample_shape=torch.Size()):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         shape = self._extended_shape(sample_shape)
-        #print('shape',shape)
+        print('shape',shape)
         ipower = 1.0 / self.p
         
         ipower = ipower.mean()#.cpu()
@@ -183,7 +200,7 @@ class GenNormal(ExponentialFamily):
         #print('~~~',binary_sample.shape,gamma_sample.shape)
         sampled = binary_sample.to(device) * torch.pow(torch.abs(gamma_sample).to(device), ipower)
         
-        print(self.loc.detach().cpu().numpy(),':::::',self.scale.detach().cpu().numpy(),':::::',self.p.detach().cpu().numpy())
+        #print(self.loc.detach().cpu().numpy(),':::::',self.scale.detach().cpu().numpy(),':::::',self.p.detach().cpu().numpy())
         #return self.loc.to(device) + self.scale.to(device) * sampled.to(device)
         return self.loc + self.scale * sampled
 
@@ -344,368 +361,417 @@ def log_ndtr_series(value: torch.Tensor, num_terms=3):
         multiplier *= -1
     return t1 + torch.log1p(t2)
 
-class MixtureSameFamily(Distribution):
-    r"""
-    The `MixtureSameFamily` distribution implements a (batch of) mixture
-    distribution where all component are from different parameterizations of
-    the same distribution type. It is parameterized by a `Categorical`
-    "selecting distribution" (over `k` component) and a component
-    distribution, i.e., a `Distribution` with a rightmost batch shape
-    (equal to `[k]`) which indexes each (batch of) component.
-    Copied from PyTorch 1.8, so that it can be used with earlier PyTorch versions.
-    Examples::
-        # Construct Gaussian Mixture Model in 1D consisting of 5 equally
-        # weighted normal distributions
-        >>> mix = D.Categorical(torch.ones(5,))
-        >>> comp = D.Normal(torch.randn(5,), torch.rand(5,))
-        >>> gmm = MixtureSameFamily(mix, comp)
-        # Construct Gaussian Mixture Modle in 2D consisting of 5 equally
-        # weighted bivariate normal distributions
-        >>> mix = D.Categorical(torch.ones(5,))
-        >>> comp = D.Independent(D.Normal(
-                     torch.randn(5,2), torch.rand(5,2)), 1)
-        >>> gmm = MixtureSameFamily(mix, comp)
-        # Construct a batch of 3 Gaussian Mixture Models in 2D each
-        # consisting of 5 random weighted bivariate normal distributions
-        >>> mix = D.Categorical(torch.rand(3,5))
-        >>> comp = D.Independent(D.Normal(
-                    torch.randn(3,5,2), torch.rand(3,5,2)), 1)
-        >>> gmm = MixtureSameFamily(mix, comp)
+# class MixtureSameFamily(Distribution):
+#     r"""
+#     The `MixtureSameFamily` distribution implements a (batch of) mixture
+#     distribution where all component are from different parameterizations of
+#     the same distribution type. It is parameterized by a `Categorical`
+#     "selecting distribution" (over `k` component) and a component
+#     distribution, i.e., a `Distribution` with a rightmost batch shape
+#     (equal to `[k]`) which indexes each (batch of) component.
+#     Copied from PyTorch 1.8, so that it can be used with earlier PyTorch versions.
+#     Examples::
+#         # Construct Gaussian Mixture Model in 1D consisting of 5 equally
+#         # weighted normal distributions
+#         >>> mix = D.Categorical(torch.ones(5,))
+#         >>> comp = D.Normal(torch.randn(5,), torch.rand(5,))
+#         >>> gmm = MixtureSameFamily(mix, comp)
+#         # Construct Gaussian Mixture Modle in 2D consisting of 5 equally
+#         # weighted bivariate normal distributions
+#         >>> mix = D.Categorical(torch.ones(5,))
+#         >>> comp = D.Independent(D.Normal(
+#                      torch.randn(5,2), torch.rand(5,2)), 1)
+#         >>> gmm = MixtureSameFamily(mix, comp)
+#         # Construct a batch of 3 Gaussian Mixture Models in 2D each
+#         # consisting of 5 random weighted bivariate normal distributions
+#         >>> mix = D.Categorical(torch.rand(3,5))
+#         >>> comp = D.Independent(D.Normal(
+#                     torch.randn(3,5,2), torch.rand(3,5,2)), 1)
+#         >>> gmm = MixtureSameFamily(mix, comp)
+#     Args:
+#         mixture_distribution: `torch.distributions.Categorical`-like
+#             instance. Manages the probability of selecting component.
+#             The number of categories must match the rightmost batch
+#             dimension of the `component_distribution`. Must have either
+#             scalar `batch_shape` or `batch_shape` matching
+#             `component_distribution.batch_shape[:-1]`
+#         component_distribution: `torch.distributions.Distribution`-like
+#             instance. Right-most batch dimension indexes component.
+#     """
+#     arg_constraints: Dict[str, constraints.Constraint] = {}
+#     has_rsample = False
+
+#     def __init__(self,
+#                  mixture_distribution,
+#                  component_distribution,
+#                  validate_args=None):
+#         self._mixture_distribution = mixture_distribution
+#         self._component_distribution = component_distribution
+
+#         if not isinstance(self._mixture_distribution, Categorical):
+#             raise ValueError(" The Mixture distribution needs to be an "
+#                              " instance of torch.distribtutions.Categorical")
+
+#         if not isinstance(self._component_distribution, Distribution):
+#             raise ValueError("The Component distribution need to be an "
+#                              "instance of torch.distributions.Distribution")
+
+#         # Check that batch size matches
+#         mdbs = self._mixture_distribution.batch_shape
+#         cdbs = self._component_distribution.batch_shape[:-1]
+#         for size1, size2 in zip(reversed(mdbs), reversed(cdbs)):
+#             if size1 != 1 and size2 != 1 and size1 != size2:
+#                 raise ValueError("`mixture_distribution.batch_shape` ({0}) is not "
+#                                  "compatible with `component_distribution."
+#                                  "batch_shape`({1})".format(mdbs, cdbs))
+
+#         # Check that the number of mixture component matches
+#         km = self._mixture_distribution.logits.shape[-1]
+#         kc = self._component_distribution.batch_shape[-1]
+#         if km is not None and kc is not None and km != kc:
+#             raise ValueError("`mixture_distribution component` ({0}) does not"
+#                              " equal `component_distribution.batch_shape[-1]`"
+#                              " ({1})".format(km, kc))
+#         self._num_component = km
+
+#         event_shape = self._component_distribution.event_shape
+#         self._event_ndims = len(event_shape)
+#         super(MixtureSameFamily, self).__init__(batch_shape=cdbs,
+#                                                 event_shape=event_shape,
+#                                                 validate_args=validate_args)
+
+#     def expand(self, batch_shape, _instance=None):
+#         batch_shape = torch.Size(batch_shape)
+#         batch_shape_comp = batch_shape + (self._num_component,)
+#         new = self._get_checked_instance(MixtureSameFamily, _instance)
+#         new._component_distribution = \
+#             self._component_distribution.expand(batch_shape_comp)
+#         new._mixture_distribution = \
+#             self._mixture_distribution.expand(batch_shape)
+#         new._num_component = self._num_component
+#         new._event_ndims = self._event_ndims
+#         event_shape = new._component_distribution.event_shape
+#         super(MixtureSameFamily, new).__init__(batch_shape=batch_shape,
+#                                                event_shape=event_shape,
+#                                                validate_args=False)
+#         new._validate_args = self._validate_args
+#         return new
+
+#     @constraints.dependent_property
+#     def support(self):
+#         # FIXME this may have the wrong shape when support contains batched
+#         # parameters
+#         return self._component_distribution.support
+
+#     @property
+#     def mixture_distribution(self):
+#         return self._mixture_distribution
+
+#     @property
+#     def component_distribution(self):
+#         return self._component_distribution
+
+#     @property
+#     def mean(self):
+#         probs = self._pad_mixture_dimensions(self.mixture_distribution.probs)
+#         return torch.sum(probs * self.component_distribution.mean,
+#                          dim=-1 - self._event_ndims)  # [B, E]
+
+#     @property
+#     def variance(self):
+#         # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
+#         probs = self._pad_mixture_dimensions(self.mixture_distribution.probs)
+#         mean_cond_var = torch.sum(probs * self.component_distribution.variance,
+#                                   dim=-1 - self._event_ndims)
+#         var_cond_mean = torch.sum(probs * (self.component_distribution.mean -
+#                                            self._pad(self.mean)).pow(2.0),
+#                                   dim=-1 - self._event_ndims)
+#         return mean_cond_var + var_cond_mean
+
+#     def cdf(self, x):
+#         x = self._pad(x)
+#         cdf_x = self.component_distribution.cdf(x)
+#         mix_prob = self.mixture_distribution.probs
+
+#         return torch.sum(cdf_x * mix_prob, dim=-1)
+
+#     def log_prob(self, x):
+#         if self._validate_args:
+#             self._validate_sample(x)
+#         x = self._pad(x)
+#         log_prob_x = self.component_distribution.log_prob(x)  # [S, B, k]
+#         log_mix_prob = torch.log_softmax(self.mixture_distribution.logits,
+#                                          dim=-1)  # [B, k]
+#         return torch.logsumexp(log_prob_x + log_mix_prob, dim=-1)  # [S, B]
+
+
+#     def sample(self, sample_shape=torch.Size()):
+#         with torch.no_grad():
+#             sample_len = len(sample_shape)
+#             batch_len = len(self.batch_shape)
+#             gather_dim = sample_len + batch_len
+#             es = self.event_shape
+
+#             # mixture samples [n, B]
+#             mix_sample = self.mixture_distribution.sample(sample_shape)
+#             mix_shape = mix_sample.shape
+
+#             # component samples [n, B, k, E]
+#             comp_samples = self.component_distribution.sample(sample_shape)
+
+#             # Gather along the k dimension
+#             mix_sample_r = mix_sample.reshape(
+#                 mix_shape + torch.Size([1] * (len(es) + 1)))
+#             mix_sample_r = mix_sample_r.repeat(
+#                 torch.Size([1] * len(mix_shape)) + torch.Size([1]) + es).squeeze()
+
+#             print('+++++',comp_samples.shape, gather_dim, mix_sample_r.shape)
+#             samples = torch.gather(comp_samples, gather_dim, mix_sample_r)
+#             return samples.squeeze(gather_dim)
+
+#     def _pad(self, x):
+#         return x.unsqueeze(-1 - self._event_ndims)
+
+#     def _pad_mixture_dimensions(self, x):
+#         dist_batch_ndims = self.batch_shape.numel()
+#         cat_batch_ndims = self.mixture_distribution.batch_shape.numel()
+#         pad_ndims = 0 if cat_batch_ndims == 1 else \
+#             dist_batch_ndims - cat_batch_ndims
+#         xs = x.shape
+#         x = x.reshape(xs[:-1] + torch.Size(pad_ndims * [1]) +
+#                       xs[-1:] + torch.Size(self._event_ndims * [1]))
+#         return x
+
+#     def __repr__(self):
+#         args_string = '\n  {},\n  {}'.format(self.mixture_distribution,
+#                                              self.component_distribution)
+#         return 'MixtureSameFamily' + '(' + args_string + ')'
+
+
+# class ReparametrizedMixtureSameFamily(MixtureSameFamily):
+#     """
+#     Adds rsample method to the MixtureSameFamily method
+#     that implements implicit reparametrization.
+#     """
+#     has_rsample = True
+    
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+
+#         if not self._component_distribution.has_rsample:
+#             raise ValueError('Cannot reparameterize a mixture of non-reparameterized components.')
+
+#         # NOTE: Not necessary for implicit reparametrisation.
+#         if not callable(getattr(self._component_distribution, '_log_cdf', None)):
+#             warnings.warn(message=('The component distributions do not have numerically stable '
+#                                    '`_log_cdf`, will use torch.log(cdf) instead, which may not '
+#                                    'be stable. NOTE: this will not affect implicit reparametrisation.'),
+#                         )
+
+#     def rsample(self, sample_shape=torch.Size()):
+#         """Adds reparameterization (pathwise) gradients to samples of the mixture.
+        
+#         Based on Tensorflow Probability implementation
+#         https://github.com/tensorflow/probability/blob/v0.12.2/tensorflow_probability/python/distributions/mixture_same_family.py#L433-L498
+#         Implicit reparameterization gradients are
+#         .. math::
+#             dx/dphi = -(d transform(x, phi) / dx)^-1 * d transform(x, phi) / dphi,
+#         where transform(x, phi) is distributional transform that removes all
+#         parameters from samples x.
+#         We implement them by replacing x with
+#         -stop_gradient(d transform(x, phi) / dx)^-1 * transform(x, phi)]
+#         for the backward pass (gradient computation).
+#         The derivative of this quantity w.r.t. phi is then the implicit
+#         reparameterization gradient.
+#         Note that this replaces the gradients w.r.t. both the mixture
+#         distribution parameters and components distributions parameters.
+#         Limitations:
+#         1. Fundamental: components must be fully reparameterized.
+#         2. Distributional transform is currently only implemented for
+#             factorized components.
+#         Args:
+#             x: Sample of mixture distribution
+#         Returns:
+#             Tensor with same value as x, but with reparameterization gradients
+#         """
+#         x = self.sample(sample_shape=sample_shape)
+
+#         event_size = prod(self.event_shape)
+#         if event_size != 1:
+#             # Multivariate case
+#             x_2d_shape = (-1, event_size)
+
+#             # Perform distributional transform of x in [S, B, E] shape,
+#             # but have Jacobian of size [S*prod(B), prod(E), prod(E)].
+#             def reshaped_distributional_transform(x_2d):
+#                 return torch.reshape(
+#                         self._distributional_transform(x_2d.reshape(x.shape)),
+#                         x_2d_shape)
+
+#             # transform_2d: [S*prod(B), prod(E)]
+#             # jacobian: [S*prod(B), prod(E), prod(E)]
+#             x_2d = x.reshape(x_2d_shape)
+#             transform_2d = reshaped_distributional_transform(x_2d)
+#             # At the moment there isn't an efficient batch-Jacobian implementation
+#             # in PyTorch, so we have to loop over the batch.
+#             # TODO: Use batch-Jacobian, once one is implemented in PyTorch.
+#             # or vmap: https://github.com/pytorch/pytorch/issues/42368
+#             jac = x_2d.new_zeros(x_2d.shape + (x_2d.shape[-1],))
+#             for i in range(x_2d.shape[0]):
+#                 jac[i, ...] = jacobian(self._distributional_transform, x_2d[i, ...]).detach()
+
+#             # We only provide the first derivative; the second derivative computed by
+#             # autodiff would be incorrect, so we raise an error if it is requested.
+#             # TODO: prevent 2nd derivative of transform_2d.
+
+#             # Compute [- stop_gradient(jacobian)^-1 * transform] by solving a linear
+#             # system. The Jacobian is lower triangular because the distributional
+#             # transform for i-th event dimension does not depend on the next
+#             # dimensions.
+#             surrogate_x_2d = -torch.triangular_solve(transform_2d[..., None], jac.detach(), upper=False)[0]
+#             surrogate_x = surrogate_x_2d.reshape(x.shape)
+#         else:
+#             # For univariate distributions the Jacobian/derivative of the transformation is the
+#             # density, so the computation is much cheaper.
+#             transform = self._distributional_transform(x)
+#             log_prob_x = self.log_prob(x)
+            
+#             if self._event_ndims > 1:
+#                 log_prob_x = log_prob_x.reshape(log_prob_x.shape + (1,)*self._event_ndims)
+
+#             surrogate_x = -transform*torch.exp(-log_prob_x.detach())
+
+#         # Replace gradients of x with gradients of surrogate_x, but keep the value.
+#         return x + (surrogate_x - surrogate_x.detach())
+
+#     def _distributional_transform(self, x):
+#         """Performs distributional transform of the mixture samples.
+#         Based on Tensorflow Probability implementation
+#         https://github.com/tensorflow/probability/blob/v0.12.2/tensorflow_probability/python/distributions/mixture_same_family.py#L500-L574
+#         Distributional transform removes the parameters from samples of a
+#         multivariate distribution by applying conditional CDFs:
+#         .. math::
+#             (F(x_1), F(x_2 | x1_), ..., F(x_d | x_1, ..., x_d-1))
+#         (the indexing is over the 'flattened' event dimensions).
+#         The result is a sample of product of Uniform[0, 1] distributions.
+#         We assume that the components are factorized, so the conditional CDFs become
+#         .. math::
+#           `F(x_i | x_1, ..., x_i-1) = sum_k w_i^k F_k (x_i),`
+#         where :math:`w_i^k` is the posterior mixture weight: for :math:`i > 0`
+#         :math:`w_i^k = w_k prob_k(x_1, ..., x_i-1) / sum_k' w_k' prob_k'(x_1, ..., x_i-1)`
+#         and :math:`w_0^k = w_k` is the mixture probability of the k-th component.
+#         Args:
+#             x: Sample of mixture distribution
+#         Returns:
+#             Result of the distributional transform
+#         """
+#         # Obtain factorized components distribution and assert that it's
+#         # a scalar distribution.
+#         if isinstance(self._component_distribution, tdistr.Independent):
+#             univariate_components = self._component_distribution.base_dist
+#         else:
+#             univariate_components = self._component_distribution
+
+#         # Expand input tensor and compute log-probs in each component
+#         x = self._pad(x)  # [S, B, 1, E]
+#         # NOTE: Only works with fully-factorised distributions!
+#         log_prob_x = univariate_components.log_prob(x)  # [S, B, K, E]
+        
+#         event_size = prod(self.event_shape)
+#         if event_size != 1:
+#             # Multivariate case
+#             # Compute exclusive cumulative sum
+#             # log prob_k (x_1, ..., x_i-1)
+#             cumsum_log_prob_x = log_prob_x.reshape(-1, event_size)  # [S*prod(B)*K, prod(E)]
+#             cumsum_log_prob_x = torch.cumsum(cumsum_log_prob_x, dim=-1)
+#             cumsum_log_prob_x = cumsum_log_prob_x.roll(1, -1)
+#             cumsum_log_prob_x[:, 0] = 0
+#             cumsum_log_prob_x = cumsum_log_prob_x.reshape(log_prob_x.shape)
+
+#             logits_mix_prob = self._pad_mixture_dimensions(self._mixture_distribution.logits)
+
+#             # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
+#             log_posterior_weights_x = logits_mix_prob + cumsum_log_prob_x
+            
+#             # Normalise posterior weights
+#             component_axis = -self._event_ndims-1
+#             posterior_weights_x = torch.softmax(log_posterior_weights_x, dim=component_axis)
+
+#             cdf_x = univariate_components.cdf(x)  # [S, B, K, E]
+#             return torch.sum(posterior_weights_x * cdf_x, dim=component_axis)
+#         else:
+#             # For univariate distributions logits of the posterior weights = log w_k
+#             log_posterior_weights_x = self._mixture_distribution.logits
+#             posterior_weights_x = torch.softmax(log_posterior_weights_x, dim=-1)
+#             posterior_weights_x = self._pad_mixture_dimensions(posterior_weights_x)
+
+#             cdf_x = univariate_components.cdf(x)  # [S, B, K, E]
+#             component_axis = -self._event_ndims-1
+#             return torch.sum(posterior_weights_x * cdf_x, dim=component_axis)
+
+
+#     def _log_cdf(self, x):
+#         x = self._pad(x)
+#         if callable(getattr(self._component_distribution, '_log_cdf', None)):
+#             log_cdf_x = self.component_distribution._log_cdf(x)
+#         else:
+#             # NOTE: This may be unstable
+#             log_cdf_x = torch.log(self.component_distribution.cdf(x))
+
+#         if isinstance(self.component_distribution, (tdistr.Bernoulli, tdistr.Binomial, tdistr.ContinuousBernoulli, 
+#                                                     tdistr.Geometric, tdistr.NegativeBinomial, tdistr.RelaxedBernoulli)):
+#             log_mix_prob = torch.sigmoid(self.mixture_distribution.logits)
+#         else:
+#             log_mix_prob = F.log_softmax(self.mixture_distribution.logits, dim=-1)
+
+#         return torch.logsumexp(log_cdf_x + log_mix_prob, dim=-1)
+
+class CustomMSF(MixtureSameFamily):
+    """MixtureSameFamily with `rsample()` method for reparametrization.
     Args:
-        mixture_distribution: `torch.distributions.Categorical`-like
-            instance. Manages the probability of selecting component.
-            The number of categories must match the rightmost batch
-            dimension of the `component_distribution`. Must have either
-            scalar `batch_shape` or `batch_shape` matching
-            `component_distribution.batch_shape[:-1]`
-        component_distribution: `torch.distributions.Distribution`-like
-            instance. Right-most batch dimension indexes component.
+        mixture_distribution (Categorical): Manages the probability of
+            selecting component. The number of categories must match the
+            rightmost batch dimension of the component_distribution.
+        component_distribution (Distribution): Define the distribution law
+            followed by the components. Right-most batch dimension indexes
+            component.
     """
-    arg_constraints: Dict[str, constraints.Constraint] = {}
-    has_rsample = False
 
-    def __init__(self,
-                 mixture_distribution,
-                 component_distribution,
-                 validate_args=None):
-        self._mixture_distribution = mixture_distribution
-        self._component_distribution = component_distribution
+    def rsample(self, sample_shape=torch.Size()):
+        """Generates a sample_shape shaped reparameterized sample or
+        sample_shape shaped batch of reparameterized samples if the
+        distribution parameters are batched.
+        Method:
+            - Apply `Gumbel Sotmax
+              <https://pytorch.org/docs/stable/generated/torch.nn.functional.gumbel_softmax.html>`_
+              on component weights to get a one-hot tensor;
+            - Sample using rsample() from the component distribution;
+            - Use the one-hot tensor to select samples.
+        .. note::
+            The component distribution of the mixture should implements a
+            rsample() method.
+        .. warning::
+            Further studies should be made on this method. It is highly
+            possible that this method is not correct.
+        """
+        assert (
+            self.component_distribution.has_rsample
+        ), "component_distribution attribute should implement rsample() method"
 
-        if not isinstance(self._mixture_distribution, Categorical):
-            raise ValueError(" The Mixture distribution needs to be an "
-                             " instance of torch.distribtutions.Categorical")
+        weights = self.mixture_distribution._param
+        comp = nn.functional.gumbel_softmax(weights, hard=True).unsqueeze(-1).squeeze()
+        samples = self.component_distribution.rsample(sample_shape)
+        #print('+++++++++++',weights.shape,comp.shape,samples.shape)
+        return (comp * samples).sum(dim=1)
 
-        if not isinstance(self._component_distribution, Distribution):
-            raise ValueError("The Component distribution need to be an "
-                             "instance of torch.distributions.Distribution")
-
-        # Check that batch size matches
-        mdbs = self._mixture_distribution.batch_shape
-        cdbs = self._component_distribution.batch_shape[:-1]
-        for size1, size2 in zip(reversed(mdbs), reversed(cdbs)):
-            if size1 != 1 and size2 != 1 and size1 != size2:
-                raise ValueError("`mixture_distribution.batch_shape` ({0}) is not "
-                                 "compatible with `component_distribution."
-                                 "batch_shape`({1})".format(mdbs, cdbs))
-
-        # Check that the number of mixture component matches
-        km = self._mixture_distribution.logits.shape[-1]
-        kc = self._component_distribution.batch_shape[-1]
-        if km is not None and kc is not None and km != kc:
-            raise ValueError("`mixture_distribution component` ({0}) does not"
-                             " equal `component_distribution.batch_shape[-1]`"
-                             " ({1})".format(km, kc))
-        self._num_component = km
-
-        event_shape = self._component_distribution.event_shape
-        self._event_ndims = len(event_shape)
-        super(MixtureSameFamily, self).__init__(batch_shape=cdbs,
-                                                event_shape=event_shape,
-                                                validate_args=validate_args)
-
-    def expand(self, batch_shape, _instance=None):
-        batch_shape = torch.Size(batch_shape)
-        batch_shape_comp = batch_shape + (self._num_component,)
-        new = self._get_checked_instance(MixtureSameFamily, _instance)
-        new._component_distribution = \
-            self._component_distribution.expand(batch_shape_comp)
-        new._mixture_distribution = \
-            self._mixture_distribution.expand(batch_shape)
-        new._num_component = self._num_component
-        new._event_ndims = self._event_ndims
-        event_shape = new._component_distribution.event_shape
-        super(MixtureSameFamily, new).__init__(batch_shape=batch_shape,
-                                               event_shape=event_shape,
-                                               validate_args=False)
-        new._validate_args = self._validate_args
-        return new
-
-    @constraints.dependent_property
-    def support(self):
-        # FIXME this may have the wrong shape when support contains batched
-        # parameters
-        return self._component_distribution.support
-
-    @property
-    def mixture_distribution(self):
-        return self._mixture_distribution
-
-    @property
-    def component_distribution(self):
-        return self._component_distribution
-
-    @property
-    def mean(self):
-        probs = self._pad_mixture_dimensions(self.mixture_distribution.probs)
-        return torch.sum(probs * self.component_distribution.mean,
-                         dim=-1 - self._event_ndims)  # [B, E]
-
-    @property
-    def variance(self):
-        # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
-        probs = self._pad_mixture_dimensions(self.mixture_distribution.probs)
-        mean_cond_var = torch.sum(probs * self.component_distribution.variance,
-                                  dim=-1 - self._event_ndims)
-        var_cond_mean = torch.sum(probs * (self.component_distribution.mean -
-                                           self._pad(self.mean)).pow(2.0),
-                                  dim=-1 - self._event_ndims)
-        return mean_cond_var + var_cond_mean
-
-    def cdf(self, x):
-        x = self._pad(x)
-        cdf_x = self.component_distribution.cdf(x)
-        mix_prob = self.mixture_distribution.probs
-
-        return torch.sum(cdf_x * mix_prob, dim=-1)
-
-    def log_prob(self, x):
+    def log_prob_agg(self, x):
         if self._validate_args:
             self._validate_sample(x)
         x = self._pad(x)
         log_prob_x = self.component_distribution.log_prob(x)  # [S, B, k]
         log_mix_prob = torch.log_softmax(self.mixture_distribution.logits,
                                          dim=-1)  # [B, k]
-        return torch.logsumexp(log_prob_x + log_mix_prob, dim=-1)  # [S, B]
-
-    def sample(self, sample_shape=torch.Size()):
-        with torch.no_grad():
-            sample_len = len(sample_shape)
-            batch_len = len(self.batch_shape)
-            gather_dim = sample_len + batch_len
-            es = self.event_shape
-
-            # mixture samples [n, B]
-            mix_sample = self.mixture_distribution.sample(sample_shape)
-            mix_shape = mix_sample.shape
-
-            # component samples [n, B, k, E]
-            comp_samples = self.component_distribution.sample(sample_shape)
-
-            # Gather along the k dimension
-            mix_sample_r = mix_sample.reshape(
-                mix_shape + torch.Size([1] * (len(es) + 1)))
-            mix_sample_r = mix_sample_r.repeat(
-                torch.Size([1] * len(mix_shape)) + torch.Size([1]) + es)
-
-            samples = torch.gather(comp_samples, gather_dim, mix_sample_r)
-            return samples.squeeze(gather_dim)
-
-    def _pad(self, x):
-        return x.unsqueeze(-1 - self._event_ndims)
-
-    def _pad_mixture_dimensions(self, x):
-        dist_batch_ndims = self.batch_shape.numel()
-        cat_batch_ndims = self.mixture_distribution.batch_shape.numel()
-        pad_ndims = 0 if cat_batch_ndims == 1 else \
-            dist_batch_ndims - cat_batch_ndims
-        xs = x.shape
-        x = x.reshape(xs[:-1] + torch.Size(pad_ndims * [1]) +
-                      xs[-1:] + torch.Size(self._event_ndims * [1]))
-        return x
-
-    def __repr__(self):
-        args_string = '\n  {},\n  {}'.format(self.mixture_distribution,
-                                             self.component_distribution)
-        return 'MixtureSameFamily' + '(' + args_string + ')'
-
-
-class ReparametrizedMixtureSameFamily(MixtureSameFamily):
-    """
-    Adds rsample method to the MixtureSameFamily method
-    that implements implicit reparametrization.
-    """
-    has_rsample = True
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if not self._component_distribution.has_rsample:
-            raise ValueError('Cannot reparameterize a mixture of non-reparameterized components.')
-
-        # NOTE: Not necessary for implicit reparametrisation.
-        if not callable(getattr(self._component_distribution, '_log_cdf', None)):
-            warnings.warn(message=('The component distributions do not have numerically stable '
-                                   '`_log_cdf`, will use torch.log(cdf) instead, which may not '
-                                   'be stable. NOTE: this will not affect implicit reparametrisation.'),
-                        )
-
-    def rsample(self, sample_shape=torch.Size()):
-        """Adds reparameterization (pathwise) gradients to samples of the mixture.
-        
-        Based on Tensorflow Probability implementation
-        https://github.com/tensorflow/probability/blob/v0.12.2/tensorflow_probability/python/distributions/mixture_same_family.py#L433-L498
-        Implicit reparameterization gradients are
-        .. math::
-            dx/dphi = -(d transform(x, phi) / dx)^-1 * d transform(x, phi) / dphi,
-        where transform(x, phi) is distributional transform that removes all
-        parameters from samples x.
-        We implement them by replacing x with
-        -stop_gradient(d transform(x, phi) / dx)^-1 * transform(x, phi)]
-        for the backward pass (gradient computation).
-        The derivative of this quantity w.r.t. phi is then the implicit
-        reparameterization gradient.
-        Note that this replaces the gradients w.r.t. both the mixture
-        distribution parameters and components distributions parameters.
-        Limitations:
-        1. Fundamental: components must be fully reparameterized.
-        2. Distributional transform is currently only implemented for
-            factorized components.
-        Args:
-            x: Sample of mixture distribution
-        Returns:
-            Tensor with same value as x, but with reparameterization gradients
-        """
-        x = self.sample(sample_shape=sample_shape)
-
-        event_size = prod(self.event_shape)
-        if event_size != 1:
-            # Multivariate case
-            x_2d_shape = (-1, event_size)
-
-            # Perform distributional transform of x in [S, B, E] shape,
-            # but have Jacobian of size [S*prod(B), prod(E), prod(E)].
-            def reshaped_distributional_transform(x_2d):
-                return torch.reshape(
-                        self._distributional_transform(x_2d.reshape(x.shape)),
-                        x_2d_shape)
-
-            # transform_2d: [S*prod(B), prod(E)]
-            # jacobian: [S*prod(B), prod(E), prod(E)]
-            x_2d = x.reshape(x_2d_shape)
-            transform_2d = reshaped_distributional_transform(x_2d)
-            # At the moment there isn't an efficient batch-Jacobian implementation
-            # in PyTorch, so we have to loop over the batch.
-            # TODO: Use batch-Jacobian, once one is implemented in PyTorch.
-            # or vmap: https://github.com/pytorch/pytorch/issues/42368
-            jac = x_2d.new_zeros(x_2d.shape + (x_2d.shape[-1],))
-            for i in range(x_2d.shape[0]):
-                jac[i, ...] = jacobian(self._distributional_transform, x_2d[i, ...]).detach()
-
-            # We only provide the first derivative; the second derivative computed by
-            # autodiff would be incorrect, so we raise an error if it is requested.
-            # TODO: prevent 2nd derivative of transform_2d.
-
-            # Compute [- stop_gradient(jacobian)^-1 * transform] by solving a linear
-            # system. The Jacobian is lower triangular because the distributional
-            # transform for i-th event dimension does not depend on the next
-            # dimensions.
-            surrogate_x_2d = -torch.triangular_solve(transform_2d[..., None], jac.detach(), upper=False)[0]
-            surrogate_x = surrogate_x_2d.reshape(x.shape)
-        else:
-            # For univariate distributions the Jacobian/derivative of the transformation is the
-            # density, so the computation is much cheaper.
-            transform = self._distributional_transform(x)
-            log_prob_x = self.log_prob(x)
-            
-            if self._event_ndims > 1:
-                log_prob_x = log_prob_x.reshape(log_prob_x.shape + (1,)*self._event_ndims)
-
-            surrogate_x = -transform*torch.exp(-log_prob_x.detach())
-
-        # Replace gradients of x with gradients of surrogate_x, but keep the value.
-        return x + (surrogate_x - surrogate_x.detach())
-
-    def _distributional_transform(self, x):
-        """Performs distributional transform of the mixture samples.
-        Based on Tensorflow Probability implementation
-        https://github.com/tensorflow/probability/blob/v0.12.2/tensorflow_probability/python/distributions/mixture_same_family.py#L500-L574
-        Distributional transform removes the parameters from samples of a
-        multivariate distribution by applying conditional CDFs:
-        .. math::
-            (F(x_1), F(x_2 | x1_), ..., F(x_d | x_1, ..., x_d-1))
-        (the indexing is over the 'flattened' event dimensions).
-        The result is a sample of product of Uniform[0, 1] distributions.
-        We assume that the components are factorized, so the conditional CDFs become
-        .. math::
-          `F(x_i | x_1, ..., x_i-1) = sum_k w_i^k F_k (x_i),`
-        where :math:`w_i^k` is the posterior mixture weight: for :math:`i > 0`
-        :math:`w_i^k = w_k prob_k(x_1, ..., x_i-1) / sum_k' w_k' prob_k'(x_1, ..., x_i-1)`
-        and :math:`w_0^k = w_k` is the mixture probability of the k-th component.
-        Args:
-            x: Sample of mixture distribution
-        Returns:
-            Result of the distributional transform
-        """
-        # Obtain factorized components distribution and assert that it's
-        # a scalar distribution.
-        if isinstance(self._component_distribution, tdistr.Independent):
-            univariate_components = self._component_distribution.base_dist
-        else:
-            univariate_components = self._component_distribution
-
-        # Expand input tensor and compute log-probs in each component
-        x = self._pad(x)  # [S, B, 1, E]
-        # NOTE: Only works with fully-factorised distributions!
-        log_prob_x = univariate_components.log_prob(x)  # [S, B, K, E]
-        
-        event_size = prod(self.event_shape)
-        if event_size != 1:
-            # Multivariate case
-            # Compute exclusive cumulative sum
-            # log prob_k (x_1, ..., x_i-1)
-            cumsum_log_prob_x = log_prob_x.reshape(-1, event_size)  # [S*prod(B)*K, prod(E)]
-            cumsum_log_prob_x = torch.cumsum(cumsum_log_prob_x, dim=-1)
-            cumsum_log_prob_x = cumsum_log_prob_x.roll(1, -1)
-            cumsum_log_prob_x[:, 0] = 0
-            cumsum_log_prob_x = cumsum_log_prob_x.reshape(log_prob_x.shape)
-
-            logits_mix_prob = self._pad_mixture_dimensions(self._mixture_distribution.logits)
-
-            # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
-            log_posterior_weights_x = logits_mix_prob + cumsum_log_prob_x
-            
-            # Normalise posterior weights
-            component_axis = -self._event_ndims-1
-            posterior_weights_x = torch.softmax(log_posterior_weights_x, dim=component_axis)
-
-            cdf_x = univariate_components.cdf(x)  # [S, B, K, E]
-            return torch.sum(posterior_weights_x * cdf_x, dim=component_axis)
-        else:
-            # For univariate distributions logits of the posterior weights = log w_k
-            log_posterior_weights_x = self._mixture_distribution.logits
-            posterior_weights_x = torch.softmax(log_posterior_weights_x, dim=-1)
-            posterior_weights_x = self._pad_mixture_dimensions(posterior_weights_x)
-
-            cdf_x = univariate_components.cdf(x)  # [S, B, K, E]
-            component_axis = -self._event_ndims-1
-            return torch.sum(posterior_weights_x * cdf_x, dim=component_axis)
-
-
-    def _log_cdf(self, x):
-        x = self._pad(x)
-        if callable(getattr(self._component_distribution, '_log_cdf', None)):
-            log_cdf_x = self.component_distribution._log_cdf(x)
-        else:
-            # NOTE: This may be unstable
-            log_cdf_x = torch.log(self.component_distribution.cdf(x))
-
-        if isinstance(self.component_distribution, (tdistr.Bernoulli, tdistr.Binomial, tdistr.ContinuousBernoulli, 
-                                                    tdistr.Geometric, tdistr.NegativeBinomial, tdistr.RelaxedBernoulli)):
-            log_mix_prob = torch.sigmoid(self.mixture_distribution.logits)
-        else:
-            log_mix_prob = F.log_softmax(self.mixture_distribution.logits, dim=-1)
-
-        return torch.logsumexp(log_cdf_x + log_mix_prob, dim=-1)
+        return torch.logsumexp(log_prob_x + log_mix_prob, dim=[-1,-2])  # [S, B]
 
 
 
@@ -740,10 +806,12 @@ class Model(object):
         self.dims = dims
         self.dimension = np.prod(dims)
         self._var_base_dist = dist_args['variable_bd']
-        self._loss = dist_args['loss']
+        self._nloss = dist_args['nloss']
+        self._bloss = dist_args['bloss']
         self.net = networks[self.name](dims=self.dims, datatype=datatype, cfg=cfg.network)
-        
-        if dist_args['bd_family'] == 'mvn':
+        self._bdist_type = dist_args['bd_family']
+
+        if self._bdist_type == 'mvn':
 
             self.mu = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['mu'])
             self.covar = torch.nn.Parameter(torch.eye(self.dimension, dtype=torch.float32).to(self.device) + dist_args['cov'])
@@ -760,7 +828,7 @@ class Model(object):
             self.net.dp2 = self.covar
             
             
-        elif dist_args['bd_family'] == 'ggd':
+        elif self._bdist_type == 'ggd':
             self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['loc'], requires_grad = True)
             self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['scale'], requires_grad = True)
             self.p = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32).to(self.device) + dist_args['p'], requires_grad = True)
@@ -782,41 +850,44 @@ class Model(object):
             self.net.dp2 = self.scale
             self.net.dp3 = self.p
             
-        elif dist_args['bd_family'] == 'mvggd':
-            self.loc = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['loc'], requires_grad = True)
-            self.scale = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['scale'], requires_grad = True)
-            self.p = torch.nn.Parameter(torch.zeros(1, dtype=torch.float32).to(self.device) + dist_args['p'], requires_grad = True)
-            self.dw = torch.nn.Parameter(torch.zeros(self.dimension, dtype=torch.float32).to(self.device) + dist_args['dw'], requires_grad = True)
-            
+        elif self._bdist_type == 'mvggd':
             if self._var_base_dist == True:
-                self.loc.requires_grad = True
-                self.scale.requires_grad = True
-                self.p.requires_grad = True
-                self.dw.requires_grad = True
-
+                self.loc = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['loc'], requires_grad = True)
+                self.scale = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['scale'], requires_grad = True)
+                self.p = torch.nn.Parameter(torch.arange(0.4,3.6,3.2/(self.dimension + 1)+0.000001,device='cuda')[1:], requires_grad = True)
+                self.dw = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['dw'], requires_grad = True)
+                print('TRUETRUE')
             else:
-                self.loc.requires_grad = False
-                self.scale.requires_grad = False
-                self.p.requires_grad = False
-                self.dw.requires_grad = False
-                
-            
-            mix = torch.distributions.Categorical(self.dw)
-            comp = GenNormal(self.loc, self.scale,self.p)
+                self.loc = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['loc'], requires_grad = False)
+                self.scale = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['scale'], requires_grad = False)
+                self.p = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['p'], requires_grad = False)
+                self.dw = torch.nn.Parameter(torch.zeros((self.dimension,), dtype=torch.float32,device = self.device) + dist_args['dw'], requires_grad = False)
+                print('FALSEFALSE')
 
-            self.base_distribution = Independent(ReparametrizedMixtureSameFamily(mix, comp),1)
-            self.net.dp1 = self.loc
-            self.net.dp2 = self.scale
-            self.net.dp3 = self.p
-            self.net.dp3 = self.dw
+                
+            with torch.no_grad():
+                mix = torch.distributions.Categorical(self.dw)
+                
+                comp = GenNormal(self.loc, self.scale,self.p)
+                self.base_distribution = CustomMSF(mix, comp)
+                self.net.dp1 = self.loc
+                self.net.dp2 = self.scale
+                self.net.dp3 = self.p
+                self.net.dp3 = self.dw
 
         
 
         
         self.net.to(self.device)
-        print('********************',self.base_distribution)
-        print(self.base_distribution.sample([10]).shape)
-
+        with torch.no_grad():
+            self._nparams = []
+            self._bparams = []
+            for name, p in self.net.named_parameters():
+                if name in ['dp1','dp2','dp3','dp4']:
+                    self._bparams.append(p)
+                else:
+                    self._nparams.append(p)
+            self._bparams.append(self.net.dp1)
         if cfg.optimizer.name == 'rmsprop':
             self.optim = torch.optim.RMSprop(self.net.parameters(),
                                              lr=cfg.optimizer.lr,
@@ -826,10 +897,24 @@ class Model(object):
                                           lr=cfg.optimizer.lr,
                                           betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
                                           weight_decay=cfg.optimizer.weight_decay)
+            self.optimn = torch.optim.Adam(self._nparams,
+                                          lr=cfg.optimizer.lr,
+                                          betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
+                                          weight_decay=cfg.optimizer.weight_decay)
+            self.optimb = torch.optim.Adam(self._bparams,
+                                          lr=cfg.optimizer.lr,
+                                          betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
+                                          weight_decay=cfg.optimizer.weight_decay)
         else:
             raise Exception('optimizer "%s" is currently not supported' % (cfg.optimizer.name))
 
         self.schduler = torch.optim.lr_scheduler.StepLR(self.optim,
+                                                        step_size=cfg.optimizer.decay_steps,
+                                                        gamma=cfg.optimizer.decay_ratio,verbose=False)
+        self.schdulern = torch.optim.lr_scheduler.StepLR(self.optimn,
+                                                        step_size=cfg.optimizer.decay_steps,
+                                                        gamma=cfg.optimizer.decay_ratio,verbose=False)
+        self.schdulerb = torch.optim.lr_scheduler.StepLR(self.optimb,
                                                         step_size=cfg.optimizer.decay_steps,
                                                         gamma=cfg.optimizer.decay_ratio,verbose=False)
 
@@ -839,44 +924,107 @@ class Model(object):
     def eval(self):
         self.net.eval()
 
-    def train_on_batch(self, y):
+    def train_on_batch(self, y, beta=-1, tbase=None):
+        
         y = y.to(self.device)
         y = y.contiguous()
 
         z, log_det_jacobian = self.net(y)
         z = z.view(y.size(0), -1)
         #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
-        if self._loss == 'ML':
-            loss = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
-        elif self._loss == 'TA':
-            beta = -1
-            #logp = self.base_distribution.log_prob(z)
-            #y,_ = self.sample_y(1000)
-            logp = self.log_pz(y)
-            #print('logp',logp.mean())
-            logp = logp #+ ((y-z)**2).mean()
-            #print('logp2',logp.mean())
-            #logq = self.log_py(z)
-            logq = self.log_py(y)
-            #print('logq',logq.mean())
-            diff = logp - logq
-            #print('diff',diff.mean())
-            weights = torch.exp(diff - diff.max())
-            prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
-            prob = torch.greater(prob, 0.5).float()
-            F = 1 - prob.sum(1) / self._batch_size
-            #print('1',F.mean())
-            gammas = F ** beta
-            #print('2',gammas.mean())
-            gammas /= gammas.sum()
-            #print('3',gammas.mean())
-            loss = torch.sum(torch.unsqueeze(gammas * diff, 1))
-        
+        #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+        if self._bdist_type != 'mvggd':
+            #lossm = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)#MEANMEAN
+            lossm = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
+        else:
+            #lossm = -1.0 * torch.mean(self.base_distribution.log_prob_agg(z) + log_det_jacobian)#MEANMEAN
+            lossm = -1.0 * torch.mean(self.base_distribution.log_prob_agg(z) + log_det_jacobian)
+        beta = beta
+        #logp = self.base_distribution.log_prob(z)
+        #y,_ = self.sample_y(1000)
+        logp = self.log_pz(y)
+        #print('logp',logp.mean())
+        logp = logp #+ ((y-z)**2).mean()
+        #print('logp2',logp.mean())
+        #logq = self.log_py(z)
+        logq = self.log_py(y)
 
-        self.optim.zero_grad()
-        loss.backward(retain_graph=True)
-        self.optim.step()
-        self.schduler.step()
+        diff = logp - logq
+        #print('logq',logq.mean())
+        
+        #print('diff',diff.mean())
+        weights = torch.exp(diff - diff.max())
+        prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
+        prob = torch.greater(prob, 0.5).float()
+        F = 1 - prob.sum(1) / self._batch_size
+        #print('1',F.mean())
+        gammas = F ** beta
+        #print('2',gammas.mean())
+        gammas /= gammas.sum()
+        #print('3',gammas.mean())
+        losst = torch.sum(torch.unsqueeze(gammas * diff, 1))
+        if self._nloss == 'ML':
+            loss = lossm
+        elif self._nloss == 'TA':
+            loss = losst
+
+        if tbase is False:
+            if self._nloss == 'TA':
+                #print('NO')
+                self.optimn.zero_grad()
+                self.optimb.zero_grad()
+                loss = losst
+                #print('***1')
+                losst.backward(retain_graph=True)
+                self.optimn.step()
+                self.schdulern.step()
+
+
+            else:
+                #print('NO')
+                #print('***2')
+                self.optimn.zero_grad()
+                self.optimb.zero_grad()
+                loss = lossm
+                lossm.backward(retain_graph=True)
+                self.optimn.step()
+                self.schdulern.step()
+
+        else:
+            if self._var_base_dist is True:
+                if self._bloss == 'ML':
+                    #print('***3')
+                    #print('BO')
+                    self.optimb.zero_grad()
+                    self.optimn.zero_grad()
+                    loss = lossm
+                    lossm.backward(retain_graph=True)
+                    self.optimb.step()
+                    self.schdulerb.step()
+
+                else:
+                    #print('BO')
+                    #print('***4')
+                    self.optimb.zero_grad()
+                    self.optimn.zero_grad()
+
+                    loss = losst
+                    losst.backward(retain_graph=True)
+                    self.optimb.step()
+                    self.schdulerb.step()
+
+
+
+        if tbase is None:
+            print('***5')
+            self.optim.zero_grad()
+            loss.backward(retain_graph=True)
+            self.optim.step()
+            self.schduler.step()
+
+        
+            
+
 
         return z, loss
 
@@ -888,6 +1036,7 @@ class Model(object):
             'step': step,
         }
         torch.save(ckpt, filename)
+        #torch.save(self.net, filename+'.sv')
 
     def load_ckpt(self, filename):
         ckpt = torch.load(filename)
@@ -902,22 +1051,31 @@ class Model(object):
         z = z.to(self.device)
 
         y, log_det_jacobians = self.net.backward(z.view(-1, *self.dims))
-        log_p = self.base_distribution.log_prob(z) - log_det_jacobians
-
+        if self._bdist_type != 'mvggd':
+            log_p = self.base_distribution.log_prob(z) - log_det_jacobians
+        else:
+            log_p = self.base_distribution.log_prob_agg(z) - log_det_jacobians
         return y, torch.exp(log_p)
 
     def sample_z(self, n):
         if self._var_base_dist:
             return self.base_distribution.rsample([n])
+            print('rsample')
+            #return self.base_distribution.sample([n])
         else:
             return self.base_distribution.sample([n])
+            print('NOrsample')
     def log_py(self, y):
+        
         y = y.to(self.device)
         z, log_det_jacobians = self.net(y)
         return self.log_pz(z) + log_det_jacobians
 
     def log_pz(self, z):
-        return self.base_distribution.log_prob(z)
+        if self._bdist_type != 'mvggd':
+            return self.base_distribution.log_prob(z)
+        else:
+            return self.base_distribution.log_prob_agg(z)
 
     def py(self, y):
         return torch.exp(self.log_py(y))
@@ -927,10 +1085,15 @@ class Model(object):
 
     def report(self, writer, y_data, step=0, save_files=False,prefix=''):
         # set to evaluation mode
+        deb = 0
         self.net.eval()
+        
+        
 
         # prepare
         y_data = y_data.to(self.device)
+        
+        
         
         n_samples = y_data.size(0)
         if y_data.dim() == 2 and y_data.size(1) == 2:
@@ -941,35 +1104,64 @@ class Model(object):
             dtype = str(y_data.size(1))+'d'
         else:
             dtype = 'image'
+        
+        
 
         title = '%s_%d_steps' % (self.name, step)
 
         # testing
         
         if dtype == '2d' or int(dtype[:-1])>3:
-            print(dtype)
+            
             # plot data samples
+            
             xs = y_data[:, 0].cpu().numpy()
             ys = y_data[:, 1].cpu().numpy()
+            
+            
+
             py = self.pz(y_data).detach().cpu().numpy() 
+            
+
             y_image = scatter_plot(xs, ys,colors=py, title=title)
             writer.add_image('2d/data/y', y_image, step, dataformats='HWC')
+            
+            
 
             if save_image:
                 out_file = prefix + 'y_data_{:06d}.jpg'.format(step)
                 save_image(out_file, y_image)
                 latest_file = prefix + 'y_data_latest.jpg'
                 shutil.copyfile(out_file, latest_file)
+                
+                
 
             # plot latent samples
             z, _ = self.net(y_data)
+            
+            
+
             pz = self.pz(z)
+            
+            
+
             z = z.detach().cpu().numpy()
+            
+            
+
             pz = pz.detach().cpu().numpy()
+
+            
+            
+            # if len(pz.shape)>1:
+            #     pz = pz.sum(1)
+            
+            
             
             
             xs = z[:, 0]
             ys = z[:, 1]
+            
             
             z_image = scatter_plot(xs, ys, colors=pz, title=title)
             writer.add_image('2d/train/z', z_image, step, dataformats='HWC')
@@ -986,6 +1178,8 @@ class Model(object):
             py = py.detach().cpu().numpy()
             xs = y[:, 0]
             ys = y[:, 1]
+            # if self._bdist_type == 'mvggd':
+            #     py = py.mean(1)
 
             y_image = scatter_plot(xs, ys, colors=py, title=title)
             writer.add_image('2d/test/y', y_image, step, dataformats='HWC')
@@ -998,17 +1192,26 @@ class Model(object):
 
             # 2D visualization
             map_size = 256
-            ix = (np.arange(map_size) + 0.5) / map_size * 2.0 - 1.0
-            iy = (np.arange(map_size) + 0.5) / map_size * -2.0 + 1.0
+            maparr = []
+            for j in range(0,int(int(dtype[:-1])/2)):
+                ix = (np.arange(map_size) + 0.5) / map_size * 2.0 - 1.0
+                iy = (np.arange(map_size) + 0.5) / map_size * -2.0 + 1.0
+                
 
-            ix, iy = np.meshgrid(ix, iy)
-            ix = ix.reshape((-1))
-            iy = iy.reshape((-1))
-            y = np.stack([ix, iy], axis=1)
+                ix, iy = np.meshgrid(ix, iy)
+                ix = ix.reshape((-1))
+                iy = iy.reshape((-1))
+                
+                maparr.append(ix)
+                maparr.append(iy)
+            y = np.stack([ar for ar in maparr], axis=1)
+            
+
             y = torch.tensor(y, dtype=torch.float32, requires_grad=True)
 
             py = self.py(y)
             py = py.detach().cpu().numpy()
+            
             py_map = py.reshape((map_size, map_size))
 
             map_image = image_plot(py_map, title=title)#, extent=[-1, 1, -1, 1])
@@ -1186,48 +1389,85 @@ Theory, 2008.
   # on the first term of the right hand side.
   return -np.log(r/s).sum() * d / n + np.log(m / (n - 1.))
 
+
+
+
+
+
+
+
+
+
+
+
 @hydra.main(config_path='configs', config_name='default')
 def main(cfg):
     # show parameters
+    #torch.autograd.set_detect_anomaly(True)
+    beta = cfg.run.fbeta
     klds = []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    ddistrib = 'ggd'
+    ddistrib = cfg.run.ddistrib
     print('***** parameters ****')
     print(OmegaConf.to_yaml(cfg))
     print('*********************')
     print('')
     ddim = cfg.run.ddim
+    
     #for loss_type in ['ML','TA']:
-    loss_type = cfg.run.loss_type
+    nloss_type = cfg.run.nloss_type
+    bloss_type = cfg.run.bloss_type
+    biters = cfg.run.biters
+    niters = cfg.run.niters
     vprior = cfg.run.vprior
     vvariable = bool(cfg.run.vvariable)
     vnbeta = cfg.run.vnbeta
     vdbeta = cfg.run.vdbeta
-    print(loss_type,vprior,vvariable,vnbeta,vdbeta)
+    print(nloss_type,bloss_type,vprior,vvariable,vnbeta,vdbeta)
     if vvariable == True:
         gn = []
         gc.collect()
         grads, sizes = [], []
         # dataset
-        if ddistrib != 'ggd':
-            dataset = FlowDataLoader(ddistrib,
-                                     batch_size=cfg.train.samples,
-                                     total_steps=cfg.train.steps,
-                                     shuffle=True)
-        else:
+        if ddistrib == 'ggd':
             dataset = FlowDataLoader(ddistrib,
                                          batch_size=cfg.train.samples,
                                          total_steps=cfg.train.steps,
                                          shuffle=True, beta = vdbeta, dim = ddim)
+        elif ddistrib == 'lognorm':
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, s = vdbeta, dim = ddim)
+        elif ddistrib == 'credit':
+    
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, dim = ddim)
+        elif ddistrib == 't':
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, df = vdbeta, dim = ddim)
+
+        else:
+            dataset = FlowDataLoader(ddistrib,
+                                     batch_size=cfg.train.samples,
+                                     total_steps=cfg.train.steps,
+                                     shuffle=True)
 
 
         # setup train/eval model
+        print('DDIMS',dataset.dims)
         if vprior == 'mvn':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., nloss = nloss_type, bloss = bloss_type)
         elif vprior == 'ggd':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, nloss = nloss_type, bloss = bloss_type)
         elif vprior == 'mvggd':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, nloss = nloss_type, bloss = bloss_type)
+        # elif vprior == 'mvexp':
+        #     model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvexp', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, nloss = nloss_type, bloss = bloss_type)
 
         # summary writer
         writer = SummaryWriter('./')
@@ -1250,36 +1490,49 @@ def main(cfg):
 
         # training
         step = start_step
+        bstep = 0
+        nstep = 0
         for data in dataset:
             # training
             model.train()
             start_time = time.perf_counter()
             y = data
-            z, loss = model.train_on_batch(y)
+            
+            if step % 2 < 1:
+                for it in range(0,niters):
+                    z, loss = model.train_on_batch(y,beta=beta,tbase=False)
+                    nstep += 1
+                #print('N',model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
-            if step % (cfg.run.display * 10) == 0:
-                #print('------------------------------------------------------------------')                            
-                #grads, sizes = [], []
-                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
-                size = 1024
-                grads.append(grad)
-                sizes.append(size)
-                flat_grads = []
-                for grad in grads:
-                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                full_grads = torch.zeros(flat_grads[-1].shape)
-                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                for g, s in zip(flat_grads, sizes):
-                    full_grads += g * s
-                full_grads /= np.sum(sizes)
-                gc.collect()
-                flat_grads = torch.stack(flat_grads)
-                sgd_noise = (flat_grads-full_grads).cpu()
-                # Grad_noise = Flat_Grads-Exact_Grad
-                #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                if sgd_noise.sum().item()>0.:
-                    gn.append(get_tail_index(sgd_noise))
-                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+            else:
+                for it in range(0,biters):
+                    z, loss = model.train_on_batch(y,beta=beta,tbase=True)
+                    bstep += 1
+                #print('B',model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+
+
+            # if step % (cfg.run.display * 10) == 0:
+                # #grads, sizes = [], []
+                # grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                # size = 1024
+                # grads.append(grad)
+                # sizes.append(size)
+                # flat_grads = []
+                # for grad in grads:
+                #     flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                # full_grads = torch.zeros(flat_grads[-1].shape)
+                # # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                # for g, s in zip(flat_grads, sizes):
+                #     full_grads += g * s
+                # full_grads /= np.sum(sizes)
+                # gc.collect()
+                # flat_grads = torch.stack(flat_grads)
+                # sgd_noise = (flat_grads-full_grads).cpu()
+                # # Grad_noise = Flat_Grads-Exact_Grad
+                # #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
+                # if sgd_noise.sum().item()>0.:
+                #     gn.append(get_tail_index(sgd_noise))
+                #     #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
                 
             
 
@@ -1288,10 +1541,10 @@ def main(cfg):
             
             
             elapsed_time = time.perf_counter() - start_time
-            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
+            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_nloss_' + nloss_type+ '_bloss_' + bloss_type + '_'
             # update for the next step
             step += 1
-
+            #print('==========',step,nstep,bstep)
             # reports
             if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
                 # logging
@@ -1301,32 +1554,63 @@ def main(cfg):
             if step == start_step + 1 or step % (cfg.run.display * 100) == 0:
                 writer.add_scalar('{:s}/train/loss'.format(dataset.dtype), loss.item(), step)
                 save_files = step % (cfg.run.display * 1000) == 0
+                
                 model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix=prefix)
                 writer.flush()
-                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+                print('==========',step,nstep,bstep)
+                #print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
             if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
                 # save ckpt
 
                 ckpt_file = prefix + 'latest.pth'
                 model.save_ckpt(step, ckpt_file)
-        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,ddim])).to(device)
+
+#---------------------------------------000000000000000000
+        nkl = 0
+        pytkl = 0
+        if ddistrib == 'credit':
+            x = torch.FloatTensor(dataset.sample(100000)).to(device)
+            x = x.contiguous()
+
+        else:
+            x = torch.FloatTensor(dataset.bdist.rvs(size=[20000,ddim])).to(device)    
+
+            #x = x.contiguous()            
+            x2 = torch.FloatTensor(np.linspace(np.zeros(ddim)[0]-500,np.full((1,ddim),-1)[0]+500,20000)).to('cuda')
+            #print('&&&&&&&&&&&&&&&&&',dataset.bdist.logpdf(x2.detach().cpu().numpy()).shape,model.log_py(x2).shape)
+            px = np.mean(np.exp(dataset.bdist.logpdf(x2.detach().cpu().numpy())),axis=1)
+            qx = model.log_py(x2)
+            #print('PX',px)
+            #print('QX',qx)
+            #print(model.sample_y(20000).cpu().detach())
+            y,_ = model.sample_y(20000)
+            pytkl = F.kl_div(qx,torch.FloatTensor(px).to(device))
+
+
+
+        z, log_det_jacobian = model.net(x2)
+        z = z.view(x.size(0), -1)
+        #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
+        #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+        if vprior != 'mvggd':
+            nkl = -1.0 * torch.mean(model.base_distribution.log_prob(z) + log_det_jacobian)#MEANMEAN
+        else:
+            nkl = -1.0 * torch.mean(model.base_distribution.log_prob_agg(z) + log_det_jacobian)#MEANMEAN
+
+
+#---------------------------------------000000000000000000
         
         
-        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
-        qx = model.log_py(x)
-        #print('PX',px)
-        #print('QX',qx)
-        #print(model.sample_y(20000).cpu().detach())
-        y,_ = model.sample_y(20000)
+        
         #print('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',get_tail_index(x),get_tail_index(y))
-        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
+        klds.append([get_tail_index(x),get_tail_index(y),pytkl,nkl,compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),nloss_type,bloss_type,vprior,vvariable,vnbeta,vdbeta,gn])
         #print(klds)
         pd.DataFrame(klds).to_csv('./kld.csv')
 
 
 
-    for vvariable in [False]:
+    elif vvariable is False:
         gn = []
         gc.collect()
         grads, sizes = [], []
@@ -1336,6 +1620,22 @@ def main(cfg):
                                      batch_size=cfg.train.samples,
                                      total_steps=cfg.train.steps,
                                      shuffle=True)
+        elif ddistrib == 'lognorm':
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, s = vdbeta, dim = ddim)
+        elif ddistrib == 'credit':
+            
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, dim = ddim)
+        elif ddistrib == 't':
+            dataset = FlowDataLoader(ddistrib,
+                                         batch_size=cfg.train.samples,
+                                         total_steps=cfg.train.steps,
+                                         shuffle=True, df = vdbeta, dim = ddim)
         else:
             dataset = FlowDataLoader(ddistrib,
                                          batch_size=cfg.train.samples,
@@ -1345,12 +1645,12 @@ def main(cfg):
 
         # setup train/eval model
         if vprior == 'mvn':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., loss = loss_type)
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvn', variable_bd = vvariable, mu = 0., cov = 1., nloss = nloss_type, bloss = bloss_type)
         elif vprior == 'ggd':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, loss = loss_type)
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'ggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dim = ddim, nloss = nloss_type, bloss = bloss_type)
         elif vprior == 'mvggd':
-            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, loss = loss_type)
-        print('ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_')
+            model = Model(dims=dataset.dims, datatype=dataset.dtype, cfg=cfg, bd_family = 'mvggd', variable_bd = vvariable, loc = 0., scale = 1., p = vnbeta, dw=1., dim = ddim, nloss = nloss_type, bloss = bloss_type)
+        print('ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_nloss_' + nloss_type+ '_bloss_NonVar_')
         # summary writer
         writer = SummaryWriter('./')
 
@@ -1369,42 +1669,52 @@ def main(cfg):
         start_step = 0
         if cfg.run.ckpt_path is not None:
             start_step = model.load_ckpt(cfg.run.ckpt_path)
+        bstep = 0
+        nstep = 0
 
         # training
         step = start_step
         for data in dataset:
-            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_loss_' + loss_type + '_'
+            prefix = 'ddim_' + str(ddim) + '_dbeta_' + str(vdbeta) + '_prior_' + vprior + '_vnoise_' + str(vvariable) + '_nbeta_' + str(vnbeta) + '_nloss_' + nloss_type + '_bloss_NonVar_'
             # training
             model.train()
             start_time = time.perf_counter()
             y = data
-            z, loss = model.train_on_batch(y)
-            
+            for it in range(0,niters):
+                z, loss = model.train_on_batch(y,beta=beta,tbase=False)
+                nstep += 1
+            #print('N',model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+
+            # elif vvariable is True:
+            #     for it in range(0,biters):
+            #         z, loss = model.train_on_batch(y,beta=beta,tbase=True)
+            #         bstep += 1
+            #     print('B',model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
             
             
             if step % (cfg.run.display * 10) == 0:
                 #print('------------------------------------------------------------------')                            
                 #grads, sizes = [], []
-                grad = [param.grad.cpu().clone() for param in model.net.parameters() if param.grad is not None]
+                # grad = [param.grad.cpu().clone() for param in model.net.parameters() if (param.grad is not None)]
                 size = 1024
-                grads.append(grad)
-                sizes.append(size)
-                flat_grads = []
-                for grad in grads:
-                    flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
-                full_grads = torch.zeros(flat_grads[-1].shape)
-                # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
-                for g, s in zip(flat_grads, sizes):
-                    full_grads += g * s
-                full_grads /= np.sum(sizes)
-                gc.collect()
-                flat_grads = torch.stack(flat_grads)
-                sgd_noise = (flat_grads-full_grads).cpu()
+                # grads.append(grad)
+                # sizes.append(size)
+                # flat_grads = []
+                # for grad in grads:
+                #     flat_grads.append(torch.cat([g.reshape(-1) for g in grad]))
+                # full_grads = torch.zeros(flat_grads[-1].shape)
+                # # Exact_Grad = torch.zeros(Flat_Grads[-1].shape).cuda()
+                # for g, s in zip(flat_grads, sizes):
+                #     full_grads += g * s
+                # full_grads /= np.sum(sizes)
+                # gc.collect()
+                # flat_grads = torch.stack(flat_grads)
+                # sgd_noise = (flat_grads-full_grads).cpu()
                 # Grad_noise = Flat_Grads-Exact_Grad
                 #print('------------------------------------------FG,SGN',flat_grads.shape, sgd_noise.shape)
-                if sgd_noise.sum().item()>0.:
-                    gn.append(get_tail_index(sgd_noise))
-                    #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
+                # if sgd_noise.sum().item()>0.:
+                #     gn.append(get_tail_index(sgd_noise))
+                #     #print('*****************',sgd_noise.shape,get_tail_index(sgd_noise))
             
             
             
@@ -1412,7 +1722,7 @@ def main(cfg):
 
             # update for the next step
             step += 1
-
+            
             # reports
             if step == start_step + 1 or step % (cfg.run.display * 10) == 0:
                 # logging
@@ -1424,23 +1734,71 @@ def main(cfg):
                 save_files = step % (cfg.run.display * 1000) == 0
                 model.report(writer, torch.FloatTensor(dataset.sample(10000)), step=step, save_files=save_files, prefix = prefix)
                 writer.flush()
-                print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
+                print('==========',step,nstep,bstep)
+                #print(model.net.dp1.detach().cpu().numpy(),model.net.dp2.detach().cpu().numpy(),model.net.dp3.detach().cpu().numpy() if model.net.dp3 is not None else 0,model.net.dp4.detach().cpu().numpy() if model.net.dp4 is not None else 0)
 
             if step == start_step + 1 or step % (cfg.run.display * 1000) == 0:
                 # save ckpt
 
                 ckpt_file = prefix + 'latest.pth'
                 model.save_ckpt(step, ckpt_file)
-        x = torch.FloatTensor(gennorm(beta=vdbeta).rvs(size=[20000,ddim])).to(device)
-        px = np.mean(np.exp(gennorm(beta=vdbeta).logpdf(x.detach().cpu().numpy())),axis=1)
-        qx = model.log_py(x)
-        print('PX',px)
-        print('QX',qx)
-        #print(model.sample_y(20000).cpu().detach())
-        y,_ = model.sample_y(20000)
-        klds.append([get_tail_index(x),get_tail_index(y),F.kl_div(qx,torch.FloatTensor(px).to(device)),compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),loss_type,vprior,vvariable,vnbeta,vdbeta,gn])
-        print(klds)
+
+
+
+
+
+
+
+
+#---------------------------------------000000000000000000
+        nkl = 0
+        pytkl = 0
+        if ddistrib == 'credit':
+            x = torch.FloatTensor(dataset.sample(100000)).to(device)
+            x = x.contiguous()
+
+        else:
+            x = torch.FloatTensor(dataset.bdist.rvs(size=[20000,ddim])).to(device)    
+
+            #x = x.contiguous()            
+            x2 = torch.FloatTensor(np.linspace(np.zeros(ddim)[0]-500,np.full((1,ddim),-1)[0]+500,20000)).to('cuda')
+            print('&&&&&&&&&&&&&&&&&',dataset.bdist.logpdf(x2.detach().cpu().numpy()).shape,model.log_py(x2).shape)
+            px = np.mean(np.exp(dataset.bdist.logpdf(x2.detach().cpu().numpy())),axis=1)
+            qx = model.log_py(x2)
+            #print('PX',px)
+            #print('QX',qx)
+            #print(model.sample_y(20000).cpu().detach())
+            y,_ = model.sample_y(20000)
+            pytkl = F.kl_div(qx,torch.FloatTensor(px).to(device))
+
+
+
+        z, log_det_jacobian = model.net(x2)
+        z = z.view(x.size(0), -1)
+        #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
+        #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+        if vprior != 'mvggd':
+            nkl = -1.0 * torch.mean(model.base_distribution.log_prob(z) + log_det_jacobian)#MEANMEAN
+        else:
+            nkl = -1.0 * torch.mean(model.base_distribution.log_prob_agg(z) + log_det_jacobian)#MEANMEAN
+
+        
+        
+        
+        #print('HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',get_tail_index(x),get_tail_index(y))
+        klds.append([get_tail_index(x),get_tail_index(y),pytkl,nkl,compute_kl_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),compute_js_divergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),compute_kl_divergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),KLdivergence(x.detach().cpu().numpy(),y.cpu().detach().numpy()),KLdivergence(y.detach().cpu().numpy(),x.cpu().detach().numpy()),nloss_type,bloss_type,vprior,vvariable,vnbeta,vdbeta,gn])
+        #print(klds)
         pd.DataFrame(klds).to_csv('./kld.csv')
+
+
+
+
+
+
+
+
+
+
                         
 
 

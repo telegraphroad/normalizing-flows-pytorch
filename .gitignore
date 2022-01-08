@@ -2,13 +2,14 @@
 .mypy_cache/*
 node_modules/*
 .DS_Store
-
+*.csv
+*/*.csv
 logs/*
 data/*
 outputs/*
 *.jpg
 *.png
 *.stats
-
+logs*/*
 *.pyc
 __pycache__/*

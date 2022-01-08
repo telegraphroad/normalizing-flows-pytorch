@@ -1,24 +1,79 @@
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_0.5_noise_v_prior_mvn +run.prior=mvn +run.beta=0.5 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_1.2_noise_v_prior_mvn +run.prior=mvn +run.beta=1.2 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.0_noise_v_prior_mvn +run.prior=mvn +run.beta=2.0 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.8_noise_v_prior_mvn +run.prior=mvn +run.beta=2.8 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_3.5_noise_v_prior_mvn +run.prior=mvn +run.beta=3.5 +run.dim=2 +cfg.run.nbeta=2.0
+flows="defaultglow.yaml"
+losses="TA  ML"
+ddistr="credit"
+bases="mvn"
+
+
+for dim in 30
+do
+
+
+	for flow in $flows
+	do 
+		for ddist in $ddistr
+		do
+
+			rm logs
+
+			rm configs/default.yaml
+			cp configs/"$flow" configs/default.yaml
 
 
 
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_0.5_noise_v_prior_mvggd +run.prior=mvggd +run.beta=0.5 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_1.2_noise_v_prior_mvggd +run.prior=mvggd +run.beta=1.2 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.0_noise_v_prior_mvggd +run.prior=mvggd +run.beta=2.0 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.8_noise_v_prior_mvggd +run.prior=mvggd +run.beta=2.8 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_3.5_noise_v_prior_mvggd +run.prior=mvggd +run.beta=3.5 +run.dim=2 +cfg.run.nbeta=2.0
+
+			varn="True"
+
+			for dbeta in 1
+			do
+				for nbeta in 5.0
+				do
+					for nlt in $losses
+					do
+						for b in $bases
+							do
+								for v in $varn
+									do
+										for blt in $losses
+											do
+												python main650.py +run.nloss_type="$nlt" +run.bloss_type="$blt" +run.vprior="$b" +run.vvariable="$v" +run.vnbeta="$nbeta" +run.vdbeta="$dbeta" +run.ddim="$dim" +run.niters=1 +run.biters=1 +run.ddistrib="$ddist"
+											done
+									done
+							done
+					done
+					
+				done
+			done
+
+			varn="False"
+			for dbeta in 1
+			do
+				for nbeta in 2.0
+				do
+					for nlt in $losses
+					do
+						for b in $bases
+							do
+								for v in $varn
+									do
+										python main650.py +run.nloss_type="$nlt" +run.bloss_type="$nlt" +run.vprior="$b" +run.vvariable="$v" +run.vnbeta="$nbeta" +run.vdbeta="$dbeta" +run.ddim="$dim" +run.niters=1 +run.biters=1 +run.ddistrib="$ddist"
+									done
+							done
+					done
+					
+				done
+			done
+			mv logs "logs11$dim${flow}${ddist}"
+		done
+	
+	done
+done
 
 
 
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_0.5_noise_v_prior_ggd +run.prior=ggd +run.beta=0.5 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_1.2_noise_v_prior_ggd +run.prior=ggd +run.beta=1.2 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.0_noise_v_prior_ggd +run.prior=ggd +run.beta=2.0 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_2.8_noise_v_prior_ggd +run.prior=ggd +run.beta=2.8 +run.dim=2 +cfg.run.nbeta=2.0
-python main.py network=glow run.distrib=ggd +run.variable=True +run.mname=data_3.5_noise_v_prior_ggd +run.prior=ggd +run.beta=3.5 +run.dim=2 +cfg.run.nbeta=2.0
+
+
+
+
 
 
 
