@@ -12,6 +12,7 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
+from robust_mean import M_estimator
 
 import torch.distributions as tdistr
 
@@ -924,6 +925,49 @@ class Model(object):
     def eval(self):
         self.net.eval()
 
+
+
+
+    def mad(self,tensor, dim=0):
+        median, _ = tensor.median(dim=dim)
+        return torch.median(torch.abs(tensor - median), dim=dim)[0]
+
+
+    def mask_outliers_mad(self,data, m=2.0):
+        median = data.median()
+        mad = torch.median(torch.abs(data - median))
+        mask = torch.abs(data - median) / mad < m
+        return mask
+
+
+    def reject_outliers_mad(self,data, m=2.0):
+        return data[self.mask_outliers_mad(data, m)]
+
+
+    def mask_outliers(self,data, m=2.0):
+        mean = data.mean()
+        std = torch.std(data)
+        mask = torch.abs(data - mean) / std < m
+        return mask
+
+
+    def reject_outliers(self,data, m=2.0):
+        return data[self.mask_outliers(data, m)]
+
+
+    def robust_mean(self,data, m=2.0):
+        return torch.mean(self.reject_outliers(data, m))
+    
+    #class MyMean(torch.autograd.Function):
+    #    def forward(ctx,inp):
+    #        ctx.save_for_backward(inp)
+    #        return robust_mean(inp)
+    #    def backward(ctx,grad_out):
+    #        inp, = ctx.saved_tensor
+
+    def robust_mean_mad(self,data, m=2.0):
+        return torch.mean(self.reject_outliers_mad(data, m))
+
     def train_on_batch(self, y, beta=-1, tbase=None):
         
         y = y.to(self.device)
@@ -934,35 +978,36 @@ class Model(object):
         #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
         #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
         if self._bdist_type != 'mvggd':
-            #lossm = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)#MEANMEAN
-            lossm = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
+            
+            ####lossm = -1.0 * torch.mean(self.base_distribution.log_prob(z) + log_det_jacobian)
+            lossm = -1.0 * self.robust_mean(self.base_distribution.log_prob(z) + log_det_jacobian)
         else:
             #lossm = -1.0 * torch.mean(self.base_distribution.log_prob_agg(z) + log_det_jacobian)#MEANMEAN
-            lossm = -1.0 * torch.mean(self.base_distribution.log_prob_agg(z) + log_det_jacobian)
+            lossm = -1.0 * self.robust_mean(self.base_distribution.log_prob_agg(z) + log_det_jacobian)
         beta = beta
         #logp = self.base_distribution.log_prob(z)
         #y,_ = self.sample_y(1000)
         logp = self.log_pz(y)
-        #print('logp',logp.mean())
+
         logp = logp #+ ((y-z)**2).mean()
-        #print('logp2',logp.mean())
+
         #logq = self.log_py(z)
         logq = self.log_py(y)
 
         diff = logp - logq
-        #print('logq',logq.mean())
+
         
-        #print('diff',diff.mean())
+
         weights = torch.exp(diff - diff.max())
         prob = torch.sign(weights.unsqueeze(1) - weights.unsqueeze(0))
         prob = torch.greater(prob, 0.5).float()
         F = 1 - prob.sum(1) / self._batch_size
-        #print('1',F.mean())
+
         gammas = F ** beta
-        #print('2',gammas.mean())
+
         gammas /= gammas.sum()
-        #print('3',gammas.mean())
-        losst = torch.sum(torch.unsqueeze(gammas * diff, 1))
+
+        losst = self.robust_mean(torch.unsqueeze(gammas * diff, 1))
         if self._nloss == 'ML':
             loss = lossm
         elif self._nloss == 'TA':

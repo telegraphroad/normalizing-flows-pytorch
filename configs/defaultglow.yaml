@@ -7,7 +7,7 @@ network:
   layers: 16
 
 train:
-  steps: 1500
+  steps: 3000
   samples: 1024
 
 optimizer:
@@ -16,7 +16,7 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
   weight_decay: 0.0
-  decay_steps: 250
+  decay_steps: 500
   decay_ratio: 0.5
 
 run:
