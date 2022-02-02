@@ -6,7 +6,7 @@ import torch
 import torchvision
 import sklearn.datasets
 from torchvision import transforms
-from scipy.stats import gennorm,lognorm,t
+from scipy.stats import gennorm,lognorm,t, cauchy
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
@@ -27,7 +27,7 @@ def _sample_ggd(n, beta, dim):
     return gennorm(beta=beta).rvs(size=[n,dim])
 
 def _sample_lognorm(n, s, dim):
-    return lognorm(s=s).rvs(size=[n,dim])
+    return cauchy.rvs(size=[n,dim])
 
 def _sample_t(n, df, dim):
     return t(df=df).rvs(size=[n,dim])
