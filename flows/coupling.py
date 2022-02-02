@@ -95,7 +95,7 @@ class AffineCoupling(AbstractCoupling):
             in_chs = dims[0] // 2 if not odd else (dims[0] + 1) // 2
             self.out_chs = dims[0] - in_chs
             self.net = MLP(in_chs, self.out_chs * 2)
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%dim1')
+
         elif len(dims) == 3:
             if masking == 'checkerboard':
                 in_out_chs = dims[0] * 2
@@ -103,7 +103,7 @@ class AffineCoupling(AbstractCoupling):
                 in_out_chs = dims[0] // 2
             self.out_chs = in_out_chs
             self.net = ConvNet(in_out_chs, in_out_chs * 2)
-            print('()()()()()()()()()()()()()()()()()()()()()()()dim3')
+
 
     def _transform(self, z0, z1, log_df_dz):
         params = self.net(z1)
