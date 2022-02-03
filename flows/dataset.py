@@ -27,6 +27,7 @@ def _sample_ggd(n, beta, dim):
     return gennorm(beta=beta).rvs(size=[n,dim])
 
 def _sample_lognorm(n, s, dim):
+    print('cauchy')
     return cauchy.rvs(size=[n,dim])
 
 def _sample_t(n, df, dim):
