@@ -3,16 +3,16 @@ hydra:
     dir: logs/${network.name}_${run.distrib}_${now:%Y-%m-%d_%H-%M-%S}
 
 network:
-  name: glow
-  layers: 28
+  name: realnvp
+  layers: 32
 
 train:
-  steps: 3000
+  steps: 10
   samples: 1024
 
 optimizer:
   name: adam
-  lr: 4.0e-4
+  lr: 1.0e-3
   beta1: 0.9
   beta2: 0.999
   weight_decay: 0.0
@@ -28,4 +28,4 @@ run:
   display: 1
 
 defaults:
-  - network: glow
+  - network: realnvp

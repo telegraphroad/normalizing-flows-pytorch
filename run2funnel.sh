@@ -1,4 +1,4 @@
-flows="defaultglow.yaml"
+flows="defaultrealnvp.yaml"
 losses="ML"
 ddistr="funnel"
 bases="gmm"
@@ -15,7 +15,7 @@ do
 				rm configs/default.yaml
 				cp configs/"$flow" configs/default.yaml
 				varn="True"
-				for dbeta in 1.0 2. 3. 6. 
+				for dbeta in 1.0 
 				do
 					for nbeta in 5.0
 					do
@@ -27,7 +27,7 @@ do
 								do
 									for blt in $losses
 									do
-										for nco in 19 69 89 149 249
+										for nco in 89 149 249 499
 										do
 											for mbs in 1.0100095  50
 											do
@@ -45,7 +45,7 @@ do
 				done
 
 				varn="False"
-				for dbeta in 1.0 2. 3. 6. 
+				for dbeta in 1.0
 				do
 					for nbeta in 2.0
 					do
@@ -55,7 +55,7 @@ do
 							do
 								for v in $varn
 								do
-									for nco in 19 69 89 149 249
+									for nco in 89 149 249 499
 									do
 										for mbs in 1.0100095  50
 										do

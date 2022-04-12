@@ -1275,7 +1275,7 @@ class Model(object):
 
         y = y.to(self.device)
         y = y.contiguous()
-
+        
         z, log_det_jacobian = self.net(y)
         z = z.view(y.size(0), -1)
         #print('!!!',self.base_distribution.log_prob(z).shape,log_det_jacobian.shape)
@@ -1283,43 +1283,43 @@ class Model(object):
         #self.net.dp3.requires_grad = True
         if self._bdist_type != 'mvggd':
             #self.net.dp3 = self.mbase
-            print('~~~~~~~~~1',self.mbase)#,self.net.dp2.grad)
+            
             tmeans = torch.logspace(0,6,1 + self.nc//2,base = self.mbase.detach().cpu().item(),device = self.device,requires_grad=self._var_base_dist)
-            print('~~~~~~~~~2',self.mbase)
+            
             # print('222',tmeans.shape)
             #print('TM',tmeans)
             rmeans = -(self.gmmdif * tmeans/tmeans.max()).min() + self.gmmdif*tmeans/tmeans.max()
-            print('~~~~~~~~~3',self.mbase)
+            
             # print('333',rmeans.shape)
             lmeans = -torch.flip(rmeans[1:],dims=[0])
-            print('~~~~~~~~~4',self.mbase)
+            
             # print('444',lmeans)
             means = torch.cat([lmeans, rmeans])
-            print('~~~~~~~~~5',self.mbase)
+            
 
             # tcovs = np.logspace(0.1,6,1 + self.nc//2,base=self.cbase)
             # rcovs = -(2000 * tcovs/tcovs.max()).min() + 2000*tcovs/tcovs.max()
             # lcovs = np.flip(rcovs[1:])
             # covs = np.concatenate([lcovs, rcovs]) + 0.001
             means = torch.dstack([means]*self.dimension).squeeze()
-            print('~~~~~~~~~6',self.mbase)#,self.net.dp2.grad)
+            
             #self.base_distribution.component_distribution.base_dist.loc = torch.tensor(means,dtype=torch.float,device=self.device)
 
             self.loc = means
-            print('~~~~~~~~~7',self.mbase)
+            
             mix = torch.distributions.Categorical(self.dw)
-            print('~~~~~~~~~8',self.mbase)
+            
 
             comp = torch.distributions.Independent(GenNormal(self.loc, self.scale,self.p), 1)
-            print('~~~~~~~~~9',self.mbase)
+            
 
             #comp = GenNormal(self.loc, self.scale,self.p)
             #print('************',comp)
             #print('************',mix)
             self.base_distribution = ReparametrizedMixtureSameFamily(mix, comp,self.mbase,self.cbase)
-            print('~~~~~~~~~10',self.mbase)
+            
             self.optimBD.zero_grad()
-            print('~~~~~~~~~11',self.mbase)#,self.net.dp2.grad)
+            
             #comp = GenNormal(self.loc, self.scale,self.p)
             # self.base_distribution = ReparametrizedMixtureSameFamily(mix, comp,self.mbase,self.cbase)
             # #self.base_distribution = torch.distributions.MixtureSameFamily(mix, comp)
@@ -1375,7 +1375,7 @@ class Model(object):
 
                 #print('***0',self.net.dp3.grad,self.mbase.grad)
                 losst.backward(retain_graph=True)
-                print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
+                #print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
                 #print('***1',self.net.dp3.grad,self.mbase.grad)
                 self.optimn.step()
                 #self.optimBD.step()
@@ -1393,7 +1393,7 @@ class Model(object):
                 loss = lossm
                 #print('***0',self.net.dp3.grad,self.mbase.grad)
                 lossm.backward(retain_graph=True)
-                print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
+                #print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
                 #print('***1',self.net.dp3.grad,self.mbase.grad)
                 self.optimn.step()
                 #self.optimBD.step()
@@ -1414,7 +1414,7 @@ class Model(object):
                     loss = lossm
                     #print('***0',self.net.dp3.grad,self.mbase.grad,self.net.dp1.grad)
                     lossm.backward(retain_graph=True)
-                    print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
+                    #print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
                     #print('***1',self.net.dp3.grad,self.mbase.grad,self.net.dp1.grad)
                     #print(self.optimb)
                     #print('OPTIMB')
@@ -1436,7 +1436,7 @@ class Model(object):
                     loss = losst
                     #print('***0',self.net.dp3.grad,self.mbase.grad,self.net.dp1.grad)
                     losst.backward(retain_graph=True)
-                    print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
+                    #print('~~~~~~~~~21',self.mbase)#,self.net.dp2.grad)
                     #print('***1',self.net.dp3.grad,self.mbase.grad,self.net.dp1.grad)
                     #print(self.optimb)
                     #print('OPTIMB')
@@ -1870,12 +1870,32 @@ Theory, 2008.
 
 
 
+class NealFunnelDist():
+    def sample(nsamples):
+        data = []
+        n_dims = 1
+        for i in range(nsamples):
+            v = norm(0, 1).rvs(1)
+            x = norm(0, np.exp(0.5*v)).rvs(n_dims)
+            data.append(np.hstack([v, x]))
+        data = pd.DataFrame(data)
+        return data.values
+    def log_prob(X):
+        v = X[:,0]
+        x = X[:,1]
+        v_like = norm(0, 1).pdf(v)
+        x_like = norm(0, np.exp(0.5*v)).pdf(x)
+        return v_like * x_like
 
 
 
 
 def pkld(p,q,ddim):
-    X = p.sample([25000,ddim]).squeeze().to('cpu')
+    if 'NealFunnelDist' not in str(type(p)):
+        X = p.sample([25000,ddim]).squeeze().to('cpu')
+    else:
+        print(type(p))
+        X = p.sample(25000).squeeze().to('cpu')
     print('xshape',X.shape)
     px = p.log_prob(X).exp()
     print('pxshape',px.shape)
@@ -1927,9 +1947,11 @@ def main(cfg):
     
     temp_target_dist = torch.distributions.StudentT(torch.tensor([vdbeta]))
     temp_X = temp_target_dist.sample((10**7,)).sort()[0]
-    temp_X = temp_X[1000:-1000]
-    temp_X_max = temp_X.max().item()
-    temp_X_min = temp_X.min().item()
+    temp_X = temp_X[10000:-10000]
+    #temp_X_max = temp_X.max().item()
+    #temp_X_min = temp_X.min().item()
+    temp_X_max = torch.tensor(100.)
+    temp_X_min = torch.tensor(-100.)
     print('MAXMEAN',temp_X_max - temp_X_min)
 
     if vvariable == True:
