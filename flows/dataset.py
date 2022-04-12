@@ -45,8 +45,8 @@ def _sample_funnel(n):
         v = norm(0, 1).rvs(1)
         x = norm(0, np.exp(0.5*v)).rvs(n_dims)
         data.append(np.hstack([v, x]))
-    
-    return data
+    data = pd.DataFrame(data)
+    return torch.tensor(data.values)
 
 def _sample_moons(n):
     samples, _ = sklearn.datasets.make_moons(N_DATASET_SIZE, noise=0.08)
