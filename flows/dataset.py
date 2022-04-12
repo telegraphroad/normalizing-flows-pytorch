@@ -6,18 +6,47 @@ import torch
 import torchvision
 import sklearn.datasets
 from torchvision import transforms
-from scipy.stats import gennorm,lognorm,t, cauchy
+from scipy.stats import gennorm,lognorm,t, cauchy, norm
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from torch.distributions import StudentT
+from scipy.stats import norm, expon
+import numpy as np
+import pandas as pd
 N_DATASET_SIZE = 65536
 
-
+class FunnelDist():
+    def sample(nsamples):
+        data = []
+        n_dims = 1
+        for i in range(nsamples):
+            v = norm(0, 1).rvs(1)
+            x = norm(0, np.exp(0.5*v)).rvs(n_dims)
+            data.append(np.hstack([v, x]))
+        data = pd.DataFrame(data)
+        return data.values
+    def log_prob(X):
+        v = X[:,0]
+        x = X[:,1]
+        v_like = norm(0, 1).pdf(v)
+        x_like = norm(0, np.exp(0.5*v)).pdf(x)
+        return v_like * x_like
+        
+        
 def _sample_circles(n):
     samples, _ = sklearn.datasets.make_circles(N_DATASET_SIZE, noise=0.08, factor=0.5)
     return samples * 0.6
 
+def _sample_funnel(n):
+    data = []
+    n_dims = 1
+    for i in range(n):
+        v = norm(0, 1).rvs(1)
+        x = norm(0, np.exp(0.5*v)).rvs(n_dims)
+        data.append(np.hstack([v, x]))
+    
+    return data
 
 def _sample_moons(n):
     samples, _ = sklearn.datasets.make_moons(N_DATASET_SIZE, noise=0.08)
@@ -124,12 +153,19 @@ class FlowDataLoader(object):
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
             self.bdist = gennorm(beta=self._args['beta'])
+
         elif self.name == 't':
             self.dset = _sample_t(N_DATASET_SIZE,self._args['df'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
             self.bdist = StudentT(torch.tensor([self._args['df']]))
-          
+
+        elif self.name == 'funnel':
+            self.dset = _sample_funnel(N_DATASET_SIZE,self._args['df'],self._args['dim'])
+            self.dims = (self._args['dim'], )
+            self.dtype = str(self._args['dim']) + 'd'
+            self.bdist = NealFunnel()
+
         elif self.name == 'lognorm':
             self.dset = _sample_lognorm(N_DATASET_SIZE,self._args['s'],self._args['dim'])
             self.dims = (self._args['dim'], )
@@ -189,6 +225,8 @@ class FlowDataLoader(object):
             return self.dsetdf.sample(n).values
         elif self.name == 'ggd':
             return _sample_ggd(n,self._args['beta'],self._args['dim'])
+        elif self.name == 'funnel':
+            return _sample_funnel(n,self._args['beta'],self._args['dim'])
         elif self.name == 't':
             return _sample_t(n,self._args['df'],self._args['dim'])
         elif self.name == 'lognorm':
