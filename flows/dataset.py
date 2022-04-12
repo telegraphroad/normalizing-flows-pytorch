@@ -226,7 +226,7 @@ class FlowDataLoader(object):
         elif self.name == 'ggd':
             return _sample_ggd(n,self._args['beta'],self._args['dim'])
         elif self.name == 'funnel':
-            return _sample_funnel(n,self._args['dim'])
+            return _sample_funnel(n)
         elif self.name == 't':
             return _sample_t(n,self._args['df'],self._args['dim'])
         elif self.name == 'lognorm':
