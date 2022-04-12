@@ -213,7 +213,7 @@ class FlowDataLoader(object):
                 data = np.reshape(data, (self.batch_size, self.dims[1], self.dims[2], -1))
                 data = np.transpose(data, axes=(0, 3, 1, 2))
             else:
-                #print(dset)
+                print('~~~~~~~~~~~~~~~~~',type(self.dset))
                 data = self.dset[idx]
                 #data = data.astype('float32')
 
