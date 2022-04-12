@@ -17,6 +17,7 @@ import pandas as pd
 N_DATASET_SIZE = 65536
 
 class NealFunnelDist():
+    @staticmethod
     def sample(nsamples):
         data = []
         n_dims = 1
@@ -26,6 +27,7 @@ class NealFunnelDist():
             data.append(np.hstack([v, x]))
         data = pd.DataFrame(data)
         return data.values
+    @staticmethod
     def log_prob(X):
         v = X[:,0]
         x = X[:,1]
