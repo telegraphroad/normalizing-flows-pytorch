@@ -162,7 +162,7 @@ class FlowDataLoader(object):
 
         elif self.name == 'funnel':
             self.dset = _sample_funnel(N_DATASET_SIZE)
-            #self.dims = (self._args['dim'], )
+            self.dims = 2
             self.dtype = '2d'
             self.bdist = NealFunnelDist()
 
