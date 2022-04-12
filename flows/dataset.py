@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 N_DATASET_SIZE = 65536
 
-class FunnelDist():
+class NealFunnelDist():
     def sample(nsamples):
         data = []
         n_dims = 1
@@ -164,7 +164,7 @@ class FlowDataLoader(object):
             self.dset = _sample_funnel(N_DATASET_SIZE)
             #self.dims = (self._args['dim'], )
             self.dtype = '2d'
-            self.bdist = NealFunnel()
+            self.bdist = NealFunnelDist()
 
         elif self.name == 'lognorm':
             self.dset = _sample_lognorm(N_DATASET_SIZE,self._args['s'],self._args['dim'])
