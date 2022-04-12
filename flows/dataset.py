@@ -10,6 +10,7 @@ from scipy.stats import gennorm,lognorm,t, cauchy
 import pandas as pd
 from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
+from torch.distributions import StudentT
 N_DATASET_SIZE = 65536
 
 
@@ -32,8 +33,8 @@ def _sample_lognorm(n, s, dim):
     return cauchy.rvs(size=[n,dim])
 
 def _sample_t(n, df, dim):
-    print('t')
-    return t(df=df).rvs(size=[n,dim])
+    #print('t')
+    return StudentT(torch.tensor([df])).sample([n,dim]).squeeze()
 
 def _sample_normals(n):
     radius = 0.7
@@ -127,7 +128,7 @@ class FlowDataLoader(object):
             self.dset = _sample_t(N_DATASET_SIZE,self._args['df'],self._args['dim'])
             self.dims = (self._args['dim'], )
             self.dtype = str(self._args['dim']) + 'd'
-            self.bdist = t(df=self._args['df'])
+            self.bdist = StudentT(torch.tensor([self._args['df']]))
           
         elif self.name == 'lognorm':
             self.dset = _sample_lognorm(N_DATASET_SIZE,self._args['s'],self._args['dim'])
@@ -168,6 +169,7 @@ class FlowDataLoader(object):
                 self._initialize()
 
             idx = self.indices[self.iter:self.iter + self.batch_size]
+            #print('idx',idx,'iter',self.iter)
             self.iter += self.batch_size
 
             if self.dtype == 'image':
@@ -175,10 +177,11 @@ class FlowDataLoader(object):
                 data = np.reshape(data, (self.batch_size, self.dims[1], self.dims[2], -1))
                 data = np.transpose(data, axes=(0, 3, 1, 2))
             else:
+                #print(dset)
                 data = self.dset[idx]
-                data = data.astype('float32')
+                #data = data.astype('float32')
 
-            yield torch.from_numpy(data)
+            yield data
     def sample(self, n):
         if self.name == 'circles':
             return _sample_circles(n)

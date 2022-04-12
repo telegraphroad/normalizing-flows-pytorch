@@ -392,7 +392,7 @@ class ResBlock2d(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, in_channels, out_channels, base_filters=32, n_blocks=2, weight_norm=True):
+    def __init__(self, in_channels, out_channels, base_filters=64, n_blocks=2, weight_norm=True):
         super(MLP, self).__init__()
 
         self.in_block = nn.Sequential(

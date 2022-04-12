@@ -4,7 +4,7 @@ hydra:
 
 network:
   name: glow
-  layers: 16
+  layers: 28
 
 train:
   steps: 3000

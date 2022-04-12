@@ -1660,7 +1660,7 @@ def main(cfg):
         gc.collect()
         grads, sizes = [], []
 
-        if ddistrib != 'ggd':
+        if ddistrib == 'ggd':
             dataset = FlowDataLoader(ddistrib,
                                      batch_size=cfg.train.samples,
                                      total_steps=cfg.train.steps,
