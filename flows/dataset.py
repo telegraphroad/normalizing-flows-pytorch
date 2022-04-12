@@ -162,8 +162,8 @@ class FlowDataLoader(object):
 
         elif self.name == 'funnel':
             self.dset = _sample_funnel(N_DATASET_SIZE)
-            self.dims = (self._args['dim'], )
-            self.dtype = str(self._args['dim']) + 'd'
+            #self.dims = (self._args['dim'], )
+            self.dtype = '2d'
             self.bdist = NealFunnel()
 
         elif self.name == 'lognorm':
